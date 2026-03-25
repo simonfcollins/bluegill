@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.schemas import LLMRequest
+from app.schemas import LLMRequest, UpdateSessionRequest
 from app.agent.agent import run_agent
 from app.services.session_manager import session_manager
 from dotenv import load_dotenv
@@ -10,15 +10,14 @@ app = FastAPI()
 
 @app.post("/query")
 async def agent_endpoint(request: LLMRequest):
-    session_id = session_manager.current_session_id or session_manager.new_session()
-    
     result = await run_agent(
         request.provider,
         request.model,
         request.prompt,
-        session_id
+        request.session_id
     )
     return {"response": result}
+
 
 @app.post("/new")
 async def create_session():
@@ -27,3 +26,31 @@ async def create_session():
     """
     session_id = session_manager.new_session()
     return {"session_id": session_id}
+
+
+@app.post("/clear")
+async def clear_session(request: UpdateSessionRequest):
+    """
+    Clears the current session context.
+    Like /new but does not create a new session.
+    """
+    session_manager.clear_session(request.session_id)
+    return {"status": "Session cleared."}
+
+
+@app.post("/compact")
+async def compact(request: UpdateSessionRequest):
+    """
+    Compact the current session context.
+    """
+    return {"status": "Not implemented."}
+
+
+@app.get("/dump")
+async def dump_session(session_id: str):
+    """
+    Returns the specified sessions message chain.
+    """
+    messages = session_manager.get_messages(session_id, limit=1000)
+    return {"messages": messages}
+    

@@ -4,7 +4,7 @@ import asyncio
 from app.agent.tools.base import Tool
 
 ALLOWED_COMMANDS = {
-    "ls", "tree", "cat", "echo", "pwd", "head", "tail"
+    "ls", "tree", "cat", "echo", "pwd", "head", "tail", "git"
 }
 
 class BashTool(Tool):

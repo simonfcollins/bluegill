@@ -7,7 +7,7 @@ class PersistentSessionManager:
     def __init__(self, db_path="sessions.db"):
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self._init_db()
-        self.current_session_id = self.load_last_session()
+
 
     def _init_db(self):
         self.conn.execute("""
@@ -21,12 +21,14 @@ class PersistentSessionManager:
         """)
         self.conn.commit()
 
+
     def add_message(self, session_id: str, role: str, content: str):
         self.conn.execute(
             "INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)",
             (session_id, role, content)
         )
         self.conn.commit()
+
 
     def get_messages(self, session_id: str, limit: int = 50) -> List[Dict]:
         cursor = self.conn.execute(
@@ -47,6 +49,7 @@ class PersistentSessionManager:
             for role, content in reversed(rows)
         ]
 
+
     def clear_session(self, session_id: str):
         self.conn.execute(
             "DELETE FROM messages WHERE session_id = ?",
@@ -55,14 +58,15 @@ class PersistentSessionManager:
         self.conn.commit()
         self.add_message(session_id, "system", BOOTSTRAP_PROMPT)
         
+        
     def new_session(self) -> str:
         """
         Generate a new session ID and initialize it with the system prompt.
         """
         session_id = str(uuid.uuid4())
-        self.current_session_id = session_id
         self.add_message(session_id, "system", BOOTSTRAP_PROMPT)
         return session_id
+    
     
     def load_last_session(self) -> str:
         cursor = self.conn.execute(
@@ -72,5 +76,14 @@ class PersistentSessionManager:
         if row:
             return row[0]
         return self.new_session()
+        
+        
+    def delete_session(self, session_id: str) -> bool:
+        raise NotImplementedError
+    
+    
+    def delete_all_sessions(self) -> None:
+        raise NotImplementedError
+        
         
 session_manager = PersistentSessionManager()

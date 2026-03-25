@@ -5,6 +5,8 @@ from app.services.llm_service import LLMService
 from app.services.session_manager import session_manager
 from app.services.logger import get_logger
 from app.agent.bootstrap_prompt import BOOTSTRAP_PROMPT
+from app.exceptions.tool_exception import ToolExecutionError
+from app.exceptions.agent_exception import JSONParseError
 
 
 def pretty(data):
@@ -12,6 +14,16 @@ def pretty(data):
         return json.dumps(data, indent=2)
     except:
         return str(data)
+    
+    
+def parse_json(text):
+    # TODO : add robust JSON extraction
+    try:
+        cleaned = re.sub(r"```json|```", "", text).strip()
+        data = json.loads(cleaned)
+        return data
+    except Exception:
+        raise JSONParseError("Error parsing JSON.")
 
 
 async def run_agent(provider: str, model: str, prompt: str, session_id: str):
@@ -31,8 +43,7 @@ async def run_agent(provider: str, model: str, prompt: str, session_id: str):
     for _ in range(20):
 
         try:
-            cleaned = re.sub(r"```json|```", "", response).strip()
-            data = json.loads(cleaned)
+            data = parse_json(response)
 
             # tool call path
             if "tool" in data:
@@ -44,7 +55,7 @@ async def run_agent(provider: str, model: str, prompt: str, session_id: str):
                 tool = TOOLS.get(tool_name)
                 if not tool:
                     return f"Unknown tool: {tool_name}"
-
+                   
                 result = await tool.run(tool_input)
                 logger.info(f"[TOOL RESULT] {result}")
 
@@ -65,16 +76,21 @@ async def run_agent(provider: str, model: str, prompt: str, session_id: str):
             # fallback
             return response
 
-        except Exception:
-            # if parsing fails, just return raw model output
-            logger.error("[ERROR] error processing query")
+        except ToolExecutionError as te:
+            logger.error(f"[TOOL ERROR] Error executing tool: {te}")
             response = await LLMService.generate(
                     provider,
                     model,
                     [{"role": "system", "content": f"An error was encountered when trying to run tool {tool_name}"}],
-                    session_id=session_id
+                    session_id
                 )
             continue
+        except JSONParseError as je:
+            logger.error(f"[JSON ERROR] {je}")
+            return response
+        except Exception:
+            logger.error("[ERROR] error processing query")
+            return response
 
     return "Max steps reached"
 
