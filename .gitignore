@@ -7,3 +7,7 @@ sessions.db
 logs
 
 .env
+
+build
+
+bluegill_agent.egg-info

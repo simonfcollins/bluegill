@@ -1,12 +1,11 @@
 from fastapi import FastAPI
-from app.schemas import LLMRequest, UpdateSessionRequest
-from app.agent.agent import run_agent
-from app.services.session_manager import session_manager
-from dotenv import load_dotenv
-
-load_dotenv()
+from apps.api.schemas import LLMRequest, UpdateSessionRequest
+from bluegill_agent.agent.agent import run_agent
+from bluegill_agent.services.workspace_provider import WorkspaceProvider
+from bluegill_agent.services.session_manager import session_manager
 
 app = FastAPI()
+WorkspaceProvider.initialize("/mnt/workspaces/")
 
 @app.post("/query")
 async def agent_endpoint(request: LLMRequest):

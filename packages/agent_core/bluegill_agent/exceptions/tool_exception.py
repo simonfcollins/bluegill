@@ -1,4 +1,4 @@
-from app.exceptions.agent_exception import AgentError
+from bluegill_agent.exceptions.agent_exception import AgentError
 
 class ToolNotFoundError(AgentError):
     pass

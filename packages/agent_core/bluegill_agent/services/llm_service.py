@@ -1,7 +1,6 @@
-from typing import AsyncGenerator
-from app.factory import ProviderFactory
-from app.services.session_manager import session_manager
-from app.services.logger import get_logger
+from bluegill_agent.providers.factory import ProviderFactory
+from bluegill_agent.services.session_manager import session_manager
+from bluegill_agent.services.logger import get_logger
 
 class LLMService:
     @staticmethod

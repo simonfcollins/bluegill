@@ -1,6 +1,5 @@
 import httpx
 import json
-from typing import AsyncGenerator
 from .base import BaseLLMProvider
 
 def format_messages(messages: list[dict]) -> str:
@@ -26,14 +25,15 @@ class LocalOllamaProvider(BaseLLMProvider):
   
     async def generate(self, messages: list[dict], model: str) -> str:
         async with httpx.AsyncClient() as client:
-            prompt = format_messages(messages)
+            prompt = format_messages(messages) # TODO : decide whether or not to use this
             
             response = await client.post(
-                "http://localhost:11434/api/generate",
+                "http://127.0.0.1:11434/api/generate",
                 json={
                     "model": model,
                     "prompt": json.dumps(messages),
                     "stream": False,
+                    "think": False
                 },
                 timeout=120,
             )

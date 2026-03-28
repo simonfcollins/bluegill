@@ -1,11 +1,16 @@
 from pathlib import Path
-from app.agent.tools.base import Tool
-import app.exceptions.safe_path_exception as spe
-from app.exceptions.tool_exception import *
+from bluegill_agent.agent.tools.base import Tool
+import bluegill_agent.exceptions.safe_path_exception as spe
+from bluegill_agent.exceptions.tool_exception import *
+from bluegill_agent.services.workspace_provider import WorkspaceProvider
 
-BASE_DIR = Path("./").resolve()
+BASE_DIR = None
 
 def safe_path(path: str) -> Path:
+    global BASE_DIR
+    
+    if BASE_DIR is None:
+        BASE_DIR = WorkspaceProvider.get_workspace()
     full_path = (BASE_DIR / path).resolve()
     try:
         full_path.relative_to(BASE_DIR)

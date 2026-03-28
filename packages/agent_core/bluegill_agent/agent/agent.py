@@ -1,12 +1,13 @@
 import json
 import re
-from app.agent.tool_registry import TOOLS
-from app.services.llm_service import LLMService
-from app.services.session_manager import session_manager
-from app.services.logger import get_logger
-from app.agent.bootstrap_prompt import BOOTSTRAP_PROMPT
-from app.exceptions.tool_exception import ToolExecutionError
-from app.exceptions.agent_exception import JSONParseError
+from bluegill_agent.agent.tool_registry import TOOLS
+from bluegill_agent.services.llm_service import LLMService
+from bluegill_agent.services.session_manager import session_manager
+from bluegill_agent.services.logger import get_logger
+from bluegill_agent.agent.bootstrap_prompt import BOOTSTRAP_PROMPT
+from bluegill_agent.exceptions.tool_exception import ToolExecutionError
+from bluegill_agent.exceptions.agent_exception import JSONParseError
+from bluegill_agent.exceptions.safe_path_exception import SafePathError
 
 
 def pretty(data):
@@ -81,13 +82,28 @@ async def run_agent(provider: str, model: str, prompt: str, session_id: str):
             response = await LLMService.generate(
                     provider,
                     model,
-                    [{"role": "system", "content": f"An error was encountered when trying to run tool {tool_name}"}],
+                    [{"role": "tool", "content": f"An error was encountered when trying to run tool {tool_name}"}],
+                    session_id
+                )
+            continue
+        except SafePathError as se:
+            logger.error(f"[SAFE PATH ERROR] {se}")
+            response = await LLMService.generate(
+                    provider,
+                    model,
+                    [{"role": "tool", "content": f"Invalid path for {tool_name} tool"}],
                     session_id
                 )
             continue
         except JSONParseError as je:
             logger.error(f"[JSON ERROR] {je}")
-            return response
+            response = await LLMService.generate(
+                    provider,
+                    model,
+                    [{"role": "system", "content": f"Your previous response was invalid JSON. You MUST output exactly one valid JSON object."}],
+                    session_id
+                )
+            continue
         except Exception:
             logger.error("[ERROR] error processing query")
             return response

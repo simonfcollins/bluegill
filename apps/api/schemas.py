@@ -6,8 +6,5 @@ class LLMRequest(BaseModel):
     prompt: str
     session_id: str
 
-class LLMResponse(BaseModel):
-    response: str
-    
 class UpdateSessionRequest(BaseModel):
     session_id: str

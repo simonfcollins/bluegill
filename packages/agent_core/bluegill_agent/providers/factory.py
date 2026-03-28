@@ -1,6 +1,6 @@
-from app.providers.openai_provider import OpenAIProvider
-from app.providers.anthropic_provider import AnthropicProvider
-from app.providers.local_ollama_provider import LocalOllamaProvider
+from bluegill_agent.providers.openai_provider import OpenAIProvider
+from bluegill_agent.providers.anthropic_provider import AnthropicProvider
+from bluegill_agent.providers.local_ollama_provider import LocalOllamaProvider
 
 class ProviderFactory:
     _providers = {

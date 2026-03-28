@@ -1,8 +1,10 @@
 import logging
 from pathlib import Path
 
-LOG_DIR = Path("logs")
-LOG_DIR.mkdir(exist_ok=True)  # ensure the logs directory exists
+BASE_DIR = Path.home() / ".bluegill"
+LOG_DIR = BASE_DIR / "logs"
+
+LOG_DIR.mkdir(parents=True, exist_ok=True) 
 
 def get_logger(session_id: str) -> logging.Logger:
     """

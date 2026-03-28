@@ -1,10 +1,16 @@
 import sqlite3
 from typing import List, Dict
 import uuid
-from app.agent.bootstrap_prompt import BOOTSTRAP_PROMPT
+from bluegill_agent.agent.bootstrap_prompt import BOOTSTRAP_PROMPT
+from pathlib import Path
+
+BASE_DIR = Path.home() / ".bluegill"
+BASE_DIR.mkdir(exist_ok=True)
+
+DB_PATH = BASE_DIR / "sessions.db"
 
 class PersistentSessionManager:
-    def __init__(self, db_path="sessions.db"):
+    def __init__(self, db_path=DB_PATH):
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self._init_db()
 

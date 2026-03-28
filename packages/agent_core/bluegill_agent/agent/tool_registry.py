@@ -1,7 +1,7 @@
 # app/agent/tool_registry.py
 
-from app.agent.tools.file_tools import ReadFileTool, WriteFileTool, EditFileTool
-from app.agent.tools.bash_tool import BashTool
+from bluegill_agent.agent.tools.file_tools import ReadFileTool, WriteFileTool, EditFileTool
+from bluegill_agent.agent.tools.bash_tool import BashTool
 
 TOOLS = {
     "read_file": ReadFileTool(),
