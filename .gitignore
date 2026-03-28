@@ -11,3 +11,5 @@ logs
 build
 
 bluegill_agent.egg-info
+
+bluegill_sdk.egg-info
