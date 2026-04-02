@@ -1,26 +1,22 @@
 import subprocess
 from pathlib import Path
 import json
+from bluegill_sdk.utils.config import *
 
 BASE_DIR = Path.home() / ".bluegill"
 BASE_DIR.mkdir(exist_ok=True)
 
 DEFAULT_WORKSPACE = BASE_DIR / "workspace"
 
-CONFIG_FILE = BASE_DIR / "config.json"
-
 DOCKER_BASE_DIR = Path("/mnt/workspaces/")
 
 DOCKER_IMAGE = "bluegill_agent:latest"
 
-def load_workspace_dirs():
-    if not CONFIG_FILE.exists():
-        return []
-    with CONFIG_FILE.open("r") as f:
-        cfg = json.load(f)
+def load_workspace_dirs() -> List[Path]:
+    cfg: Config = load_config()
         
     workspaces = []
-    for ws in cfg.get("workspaces", []):
+    for ws in cfg["workspaces"]:
         path = Path(ws["path"]).expanduser().resolve()
         workspaces.append(path)
         

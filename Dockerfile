@@ -8,6 +8,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY packages/agent_core ./packages/agent_core
 RUN pip install ./packages/agent_core
 
+COPY packages/sdk_python ./packages/sdk_python
+RUN pip install ./packages/sdk_python
+
 COPY apps/api ./apps/api
 
 RUN useradd -m agentuser
