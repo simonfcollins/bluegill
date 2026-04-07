@@ -40,11 +40,13 @@ class Agent:
             self._client = httpx.AsyncClient(timeout=self.timeout)
         return self._client
 
+
     async def close(self):
         """Close underlying HTTP client."""
         if self._client:
             await self._client.aclose()
             self._client = None
+
 
     # ------------------------
     # Core Methods
@@ -77,6 +79,7 @@ class Agent:
         except httpx.HTTPError:
             return ""
 
+
     async def generate(self, prompt: str) -> str:
         """
         Generate using configured provider + model.
@@ -87,6 +90,7 @@ class Agent:
         return await self.generate_with_model(
             self.provider, self.model, prompt
         )
+
 
     async def clear_session(self) -> None:
         """
@@ -107,6 +111,7 @@ class Agent:
         except httpx.HTTPError:
             pass  # silent fail (optional: log)
 
+
     async def create_session(self) -> str:
         """
         Create new session and store it.
@@ -122,6 +127,39 @@ class Agent:
 
         except httpx.HTTPError:
             return ""
+        
+    
+    async def get_sessions(self) -> List[str]:
+        """
+        Get a list of all available sessions.
+        """
+        client = await self._get_client()
+        
+        try:
+            response = await client.get(f"{self.api_url}/sessions")
+            response.raise_for_status()
+            
+            return response.json().get("sessions", [])
+        
+        except httpx.HTTPError:
+            return []
+        
+        
+    async def get_last_session(self) -> str:
+        """
+        Get the last active session.
+        """
+        client = await self._get_client()
+        
+        try:
+            response = await client.get(f"{self.api_url}/last")
+            response.raise_for_status()
+            
+            return response.json().get("session_id", "")
+        
+        except httpx.HTTPError:
+            return ""
+        
 
     async def dump(self) -> List[Dict]:
         """
@@ -144,8 +182,10 @@ class Agent:
         except httpx.HTTPError:
             return []
 
+
     async def compact(self):
         raise NotImplementedError
+
 
     # ------------------------
     # Helpers
@@ -154,6 +194,7 @@ class Agent:
     def is_ready(self) -> bool:
         return all([self.provider, self.model, self.session_id])
 
+
     # ------------------------
     # Properties
     # ------------------------
@@ -161,6 +202,7 @@ class Agent:
     @property
     def provider(self) -> Optional[str]:
         return self._provider
+
 
     @provider.setter
     def provider(self, provider: Optional[str]):

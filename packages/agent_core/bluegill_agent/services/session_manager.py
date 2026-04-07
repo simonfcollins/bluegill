@@ -16,6 +16,7 @@ class PersistentSessionManager:
 
 
     def _init_db(self):
+        # Create messages table
         self.conn.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,10 +26,22 @@ class PersistentSessionManager:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
+        
+        # Create sessions table
+        self.conn.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
         self.conn.commit()
 
 
     def add_message(self, session_id: str, role: str, content: str):
+        """
+        Persist a new message entity to the database.
+        """
         self.conn.execute(
             "INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)",
             (session_id, role, content)
@@ -37,6 +50,9 @@ class PersistentSessionManager:
 
 
     def get_messages(self, session_id: str, limit: int = 50) -> List[Dict]:
+        """
+        Get all messages from a given session.
+        """
         cursor = self.conn.execute(
             """
             SELECT role, content FROM messages
@@ -56,7 +72,21 @@ class PersistentSessionManager:
         ]
 
 
+    def _add_session(self, session_id: str, name: str = ""):
+        """
+        Persists a new session entity to the database.
+        """
+        self.conn.execute(
+            "INSERT INTO sessions (id, name) VALUES (?, ?)",
+            (session_id, name)
+        )
+        self.conn.commit()
+
+
     def clear_session(self, session_id: str):
+        """
+        Clears the established session user-assistant context.
+        """
         self.conn.execute(
             "DELETE FROM messages WHERE session_id = ?",
             (session_id,)
@@ -70,11 +100,15 @@ class PersistentSessionManager:
         Generate a new session ID and initialize it with the system prompt.
         """
         session_id = str(uuid.uuid4())
+        self._add_session(session_id)
         self.add_message(session_id, "system", BOOTSTRAP_PROMPT)
         return session_id
     
     
     def load_last_session(self) -> str:
+        """
+        Retrieves the last used session.
+        """
         cursor = self.conn.execute(
             "SELECT session_id FROM messages ORDER BY id DESC LIMIT 1"
         )
@@ -82,6 +116,17 @@ class PersistentSessionManager:
         if row:
             return row[0]
         return self.new_session()
+    
+    
+    def get_sessions(self) -> List[str]:
+        """
+        Retrieves all available sessions.
+        """
+        cursor = self.conn.execute(
+            "SELECT id FROM sessions"
+        )
+        rows = cursor.fetchall()
+        return [row[0] for row in rows]
         
         
     def delete_session(self, session_id: str) -> bool:

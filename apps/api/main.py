@@ -53,3 +53,20 @@ async def dump_session(session_id: str):
     messages = session_manager.get_messages(session_id, limit=1000)
     return {"messages": messages}
     
+    
+@app.get("/sessions")
+async def get_sessions():
+    """
+    Returns a list of all session IDs.
+    """
+    sessions = session_manager.get_sessions()
+    return {"sessions": sessions}
+
+
+@app.get("/last")
+async def get_last_session():
+    """
+    Returns the last active session.
+    """
+    session_id = session_manager.load_last_session()
+    return {"session_id": session_id}
