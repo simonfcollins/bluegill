@@ -155,10 +155,10 @@ class Agent:
             response = await client.get(f"{self.api_url}/last")
             response.raise_for_status()
             
-            return response.json().get("session_id", "")
+            return response.json()
         
         except httpx.HTTPError:
-            return ""
+            return {"session_id": "", "name": ""}
         
 
     async def dump(self) -> List[Dict]:

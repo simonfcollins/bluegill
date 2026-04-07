@@ -68,5 +68,4 @@ async def get_last_session():
     """
     Returns the last active session.
     """
-    session_id = session_manager.load_last_session()
-    return {"session_id": session_id}
+    return session_manager.load_last_session()

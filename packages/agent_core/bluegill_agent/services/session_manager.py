@@ -107,15 +107,21 @@ class PersistentSessionManager:
     
     def load_last_session(self) -> str:
         """
-        Retrieves the last used session.
+        Retrieve the last used session.
+        Returns a new sessions if none exist.
         """
         cursor = self.conn.execute(
             "SELECT session_id FROM messages ORDER BY id DESC LIMIT 1"
         )
         row = cursor.fetchone()
         if row:
-            return row[0]
-        return self.new_session()
+            cursor = self.conn.execute(
+                "SELECT id, name FROM sessions where id = ?", (row[0],)
+            )
+            row = cursor.fetchone()
+            return {"session_id": row[0], "name": row[1]}
+        session_id = self.new_session()
+        return {"session_id": session_id, "name": ""}
     
     
     def get_sessions(self) -> List[str]:
@@ -123,10 +129,10 @@ class PersistentSessionManager:
         Retrieves all available sessions.
         """
         cursor = self.conn.execute(
-            "SELECT id FROM sessions"
+            "SELECT id, name FROM sessions"
         )
         rows = cursor.fetchall()
-        return [row[0] for row in rows]
+        return [{"session_id": row[0], "name": row[1]} for row in rows]
         
         
     def delete_session(self, session_id: str) -> bool:
