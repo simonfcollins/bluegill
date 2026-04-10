@@ -1,146 +1,135 @@
-import sqlite3
-from typing import List, Dict
 import uuid
 from bluegill_agent.agent.bootstrap_prompt import BOOTSTRAP_PROMPT
-from pathlib import Path
+from bluegill_agent.repository.message_repository import message_repository
+from bluegill_agent.repository.session_repository import session_repository
+from bluegill_agent.entity.message import Message
+from bluegill_agent.entity.session import Session
 
-BASE_DIR = Path.home() / ".bluegill"
-BASE_DIR.mkdir(exist_ok=True)
-
-DB_PATH = BASE_DIR / "sessions.db"
 
 class PersistentSessionManager:
-    def __init__(self, db_path=DB_PATH):
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
-        self._init_db()
+    
+    def __init__(self):
+        pass
 
 
-    def _init_db(self):
-        # Create messages table
-        self.conn.execute("""
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id TEXT,
-            role TEXT,
-            content TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """)
-        
-        # Create sessions table
-        self.conn.execute("""
-        CREATE TABLE IF NOT EXISTS sessions (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """)
-        self.conn.commit()
-
-
-    def add_message(self, session_id: str, role: str, content: str):
+    def add_message(self, session_id: str, role: str, content: str) -> None:
         """
         Persist a new message entity to the database.
+        
+        Params:
+            session_id - The primary key of the session this new message belongs to.
+            role - The entity that generated the message ("user", "assistant", "system", "tool").
+            content - The content of the message.
         """
-        self.conn.execute(
-            "INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)",
-            (session_id, role, content)
-        )
-        self.conn.commit()
+        
+        message_repository.insert(Message(
+            session_id=session_id,
+            role=role,
+            content=content
+        ))
 
 
-    def get_messages(self, session_id: str, limit: int = 50) -> List[Dict]:
+    def get_messages(self, session_id: str) -> list[Message]:
         """
         Get all messages from a given session.
+        
+        Params:
+            session_id - The id of the session from which messages should be retrieved.
+            
+        Returns:
+            A list of Messages.
         """
-        cursor = self.conn.execute(
-            """
-            SELECT role, content FROM messages
-            WHERE session_id = ?
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (session_id, limit)
-        )
-
-        rows = cursor.fetchall()
-
-        # reverse to chronological order
-        return [
-            {"role": role, "content": content}
-            for role, content in reversed(rows)
-        ]
+        
+        return message_repository.get_by_session_id(session_id)
 
 
-    def _add_session(self, session_id: str, name: str = ""):
+    def _add_session(self, session_id: str, name: str = "") -> None:
         """
         Persists a new session entity to the database.
+        
+        Params:
+            session_id - The primary key of the new session.
+            name - A descriptive name for the new session.
         """
-        self.conn.execute(
-            "INSERT INTO sessions (id, name) VALUES (?, ?)",
-            (session_id, name)
+        
+        session_repository.insert(Session(
+            id=session_id, 
+            name=name
+            )
         )
-        self.conn.commit()
 
 
-    def clear_session(self, session_id: str):
+    def clear_session(self, session_id: str) -> None:
         """
-        Clears the established session user-assistant context.
+        Clears the established session user-assistant context while
+        retaining skills and bootstrap context.
+        
+        Params:
+            session_id - The id of the session to clear.
         """
-        self.conn.execute(
-            "DELETE FROM messages WHERE session_id = ?",
-            (session_id,)
-        )
-        self.conn.commit()
+        
+        message_repository.delete_by_session_id(session_id)
         self.add_message(session_id, "system", BOOTSTRAP_PROMPT)
         
         
-    def new_session(self) -> str:
+    def new_session(self) -> Session:
         """
         Generate a new session ID and initialize it with the system prompt.
+        
+        Returns:
+            A new Session.
         """
+        
         session_id = str(uuid.uuid4())
         self._add_session(session_id)
         self.add_message(session_id, "system", BOOTSTRAP_PROMPT)
-        return session_id
+        return session_repository.get(session_id)
     
     
-    def load_last_session(self) -> str:
+    def load_last_session(self) -> Session | None:
         """
         Retrieve the last used session.
-        Returns a new sessions if none exist.
+        
+        Returns:
+            The last used session or None if no sessions exist.
         """
-        cursor = self.conn.execute(
-            "SELECT session_id FROM messages ORDER BY id DESC LIMIT 1"
-        )
-        row = cursor.fetchone()
-        if row:
-            cursor = self.conn.execute(
-                "SELECT id, name FROM sessions where id = ?", (row[0],)
-            )
-            row = cursor.fetchone()
-            return {"session_id": row[0], "name": row[1]}
+        
+        last_message = message_repository.get_last()
+        
+        if last_message:
+            return session_repository.get(last_message.session_id)
         session_id = self.new_session()
-        return {"session_id": session_id, "name": ""}
+        return session_repository.get(session_id)
     
     
-    def get_sessions(self) -> List[str]:
+    def get_sessions(self) -> list[Session]:
         """
         Retrieves all available sessions.
+        
+        Returns:
+            A list of Sessions. 
         """
-        cursor = self.conn.execute(
-            "SELECT id, name FROM sessions"
-        )
-        rows = cursor.fetchall()
-        return [{"session_id": row[0], "name": row[1]} for row in rows]
         
+        return session_repository.get_all()
+      
         
-    def delete_session(self, session_id: str) -> bool:
-        raise NotImplementedError
+    def delete_session(self, session_id: str) -> None:
+        """
+        Delete a session and all corresponding messages.
+        
+        Params:
+            session_id - The id of the session to delete.
+        """
+        
+        session_repository.delete(session_id)
     
     
     def delete_all_sessions(self) -> None:
-        raise NotImplementedError
+        """
+        Delete all sessions and messages.
+        """
+        
+        session_repository.delete_all()
         
         
 session_manager = PersistentSessionManager()

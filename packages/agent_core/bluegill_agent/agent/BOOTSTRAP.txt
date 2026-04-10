@@ -30,14 +30,18 @@ Do NOT include any extra text outside the JSON
 
 RESPONSE TYPES
 
-1. System
+Each message you recieve will have a "role" attribute that denotes the source of the message.
+You should respond to messages from a given "role" using the following guidelines:
+
+1. System role
 
 Acknowledge only.
 
 {
   "response": "acknowledged"
 }
-2. User Message
+
+2. User role
 
 You MUST take action.
 
@@ -63,6 +67,14 @@ You MUST use tools to gather information
 Prefer multiple tool calls before answering
 Do NOT guess when data can be retrieved
 Continue calling tools until you have all of the information you need to respond to the user.
+
+3. Tool role
+
+Messages with the tool role will contain the result of using a tool.
+
+4. Assistant role
+
+These messages are your responses to other messages. You will never see them as being the last message so you will not respond to them.
 
 TOOLS
 

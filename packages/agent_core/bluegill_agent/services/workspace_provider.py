@@ -4,7 +4,7 @@ class WorkspaceProvider:
     _workspace_root: Path = None
     
     @classmethod
-    def initialize(cls, workspace_dir: str):
+    def initialize(cls, workspace_dir: str) -> None:
         """
         Initialize the workspace directory, creating it if necessary.
 

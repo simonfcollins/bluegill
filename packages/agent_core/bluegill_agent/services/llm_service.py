@@ -21,8 +21,13 @@ class LLMService:
         # Load full session context
         messages = session_manager.get_messages(session_id)
         
+        # Format messages to reduce token count
+        messages_f = [{"role": m.role, "content": m.content} for m in messages]
+        messages_f.reverse()
+        print(messages_f)
+    
         # Call provider with full context
-        response = await llm_provider.generate(messages, model)
+        response = await llm_provider.generate(messages_f, model)
         logger.info(f"[ASSISTANT] {response}")
         
         # Store response

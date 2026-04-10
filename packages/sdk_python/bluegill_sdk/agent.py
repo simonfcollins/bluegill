@@ -1,5 +1,4 @@
 import httpx
-from typing import List, Dict, Optional
 from bluegill_sdk.schemas import GenerateRequest, SessionIdRequest
 
 VALID_PROVIDERS = ["ollama"]
@@ -17,11 +16,11 @@ class Agent:
     def __init__(
         self,
         api_url: str = "http://localhost:54345",
-        provider: Optional[str] = None,
-        model: Optional[str] = None,
-        session_id: Optional[str] = None,
+        provider: str | None = None,
+        model: str | None = None,
+        session_id: str | None = None,
         timeout: int = 60,
-    ):
+    ) -> None:
         self.api_url = api_url.rstrip("/")
         self._provider = None
         self.provider = provider  # go through setter
@@ -29,7 +28,7 @@ class Agent:
         self.session_id = session_id
         self.timeout = timeout
 
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
 
     # ------------------------
     # Lifecycle
@@ -41,7 +40,7 @@ class Agent:
         return self._client
 
 
-    async def close(self):
+    async def close(self) -> None:
         """Close underlying HTTP client."""
         if self._client:
             await self._client.aclose()
@@ -109,7 +108,7 @@ class Agent:
                 json=payload.model_dump(),
             )
         except httpx.HTTPError:
-            pass  # silent fail (optional: log)
+            pass
 
 
     async def create_session(self) -> str:
@@ -129,7 +128,7 @@ class Agent:
             return ""
         
     
-    async def get_sessions(self) -> List[str]:
+    async def get_sessions(self) -> list[str]:
         """
         Get a list of all available sessions.
         """
@@ -161,7 +160,7 @@ class Agent:
             return {"session_id": "", "name": ""}
         
 
-    async def dump(self) -> List[Dict]:
+    async def dump(self) -> list[dict]:
         """
         Get session message history.
         """
@@ -200,12 +199,12 @@ class Agent:
     # ------------------------
 
     @property
-    def provider(self) -> Optional[str]:
+    def provider(self) -> str | None:
         return self._provider
 
 
     @provider.setter
-    def provider(self, provider: Optional[str]):
+    def provider(self, provider: str | None) -> None:
         if provider is not None and provider not in VALID_PROVIDERS:
             raise ValueError(f"Unsupported provider: {provider}")
         self._provider = provider

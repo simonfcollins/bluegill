@@ -8,16 +8,17 @@ from bluegill_agent.agent.bootstrap_prompt import BOOTSTRAP_PROMPT
 from bluegill_agent.exceptions.tool_exception import ToolExecutionError
 from bluegill_agent.exceptions.agent_exception import JSONParseError
 from bluegill_agent.exceptions.safe_path_exception import SafePathError
+from typing import Any
 
 
-def pretty(data):
+def pretty(data) -> str:
     try:
         return json.dumps(data, indent=2)
     except:
         return str(data)
     
     
-def parse_json(text):
+def parse_json(text) -> Any:
     # TODO : add robust JSON extraction
     try:
         cleaned = re.sub(r"```json|```", "", text).strip()
@@ -110,8 +111,8 @@ async def run_agent(provider: str, model: str, prompt: str, session_id: str):
 
     return "Max steps reached"
 
-def ensure_system_prompt(session_id):
+def ensure_system_prompt(session_id) -> None:
     messages = session_manager.get_messages(session_id)
 
-    if not any(m["role"] == "system" for m in messages):
+    if not any(m.role == "system" for m in messages):
         session_manager.add_message(session_id, "system", BOOTSTRAP_PROMPT)
