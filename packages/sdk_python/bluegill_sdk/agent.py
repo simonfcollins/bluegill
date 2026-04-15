@@ -1,189 +1,215 @@
+from datetime import UTC, datetime
+from typing import List, Optional
 import httpx
-from bluegill_sdk.schemas import GenerateRequest, SessionIdRequest
+
+from bluegill_sdk.schemas import (
+    GenerateRequest,
+    SessionIdRequest,
+    Message,
+    Session,
+)
 
 VALID_PROVIDERS = ["ollama"]
 
+
 class Agent:
-    """
-    Async client for interacting with the Bluegill API.
-
-    Features:
-    - Persistent HTTP client (connection pooling)
-    - Session management
-    - Safe request handling
-    """
-
     def __init__(
         self,
-        api_url: str = "http://localhost:54345",
-        provider: str | None = None,
-        model: str | None = None,
-        session_id: str | None = None,
-        timeout: int = 60,
+        api_url: str = "http://localhost:54345", # URL where the Bluegill API is running.
+        provider: Optional[str] = None,          # The model provider (e.g. "ollama")
+        model: Optional[str] = None,             # The model to use for queries (e.g. "qwen3-coder:latest")
+        session_id: Optional[str] = None,        # The ID of the active session.
+        timeout: int = 60,                       # The timeout value injected into the header of all API calls.
     ) -> None:
         self.api_url = api_url.rstrip("/")
         self._provider = None
-        self.provider = provider  # go through setter
+        self.provider = provider
         self.model = model
         self.session_id = session_id
         self.timeout = timeout
 
-        self._client: httpx.AsyncClient | None = None
-
-    # ------------------------
-    # Lifecycle
-    # ------------------------
-
-    async def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None:
-            self._client = httpx.AsyncClient(timeout=self.timeout)
-        return self._client
-
-
-    async def close(self) -> None:
-        """Close underlying HTTP client."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        self.messages: List[Message] = []
+        self._client = httpx.Client(timeout=self.timeout)
 
 
     # ------------------------
     # Core Methods
     # ------------------------
 
-    async def generate_with_model(self, provider: str, model: str, prompt: str) -> str:
+    def get_sessions(self) -> List[Session]:
         """
-        Generate response using explicit provider + model.
+        Retrieve a list of available sessions.
+        
+        Returns:
+            A list of sessions.
         """
-        if not prompt:
+        
+        try:
+            r = self._client.get(f"{self.api_url}/sessions")
+            r.raise_for_status()
+            return [Session(**s) for s in r.json()]
+        except httpx.HTTPError:
+            return []
+
+
+    def new_session(self) -> str:
+        """
+        Creat a new session and set it as the current session.
+        
+        Returns:
+            The ID of the new session.
+        """
+        
+        try:
+            r = self._client.post(f"{self.api_url}/new")
+            r.raise_for_status()
+            self.session_id = r.json().get("session_id")
+            self.messages = []
+            return self.session_id or ""
+        except httpx.HTTPError:
             return ""
 
-        client = await self._get_client()
+
+    def load_last_session(self) -> None:
+        """
+        Set the last active session as the active session.
+        """
+        
+        try:
+            r = self._client.get(f"{self.api_url}/last")
+            r.raise_for_status()
+
+            session = Session(**r.json())
+            self.session_id = session.id
+
+            self._load_conversation()
+
+        except httpx.HTTPError:
+            pass
+
+
+    def _load_conversation(self) -> None:
+        """
+        Load the user-assistant message chain of the active session.
+        Stored by self.messages.
+        """
+        
+        if not self.session_id:
+            self.messages = []
+            return
+
+        try:
+            r = self._client.get(
+                f"{self.api_url}/history",
+                params={"session_id": self.session_id},
+            )
+            r.raise_for_status()
+            self.messages = [Message(**m) for m in r.json()]
+        except httpx.HTTPError:
+            self.messages = []
+
+
+    def clear_session(self) -> None:
+        """
+        Clear the context of the active session.
+        """
+        
+        if not self.session_id:
+            return
+
+        try:
+            self._client.post(
+                f"{self.api_url}/clear",
+                json=SessionIdRequest(
+                    session_id=self.session_id
+                ).model_dump(),
+            )
+            self.messages = []
+        except httpx.HTTPError:
+            pass
+
+
+    def generate(self, prompt: str) -> str:
+        """
+        Query the model within the active session.
+        
+        Params:
+            prompt: The query to be sent to the model.
+            
+        Returns:
+            The models response to the given query.
+        """
+        
+        if not self.is_ready() or not prompt:
+            return ""
+
+        self.messages.append(
+            Message(
+                role="user",
+                content=prompt,
+                created_at=datetime.now(UTC).isoformat(),
+            )
+        )
 
         payload = GenerateRequest(
-            provider=provider,
-            model=model,
+            provider=self.provider,
+            model=self.model,
             session_id=self.session_id,
             prompt=prompt,
         )
 
         try:
-            response = await client.post(
-                f"{self.api_url}/generate",
+            r = self._client.post(
+                f"{self.api_url}/query",
                 json=payload.model_dump(),
             )
-            response.raise_for_status()
-            return response.json().get("result", "")
+            r.raise_for_status()
+
+            result = r.json().get("response", "")
+
+            self.messages.append(
+                Message(
+                    role="assistant",
+                    content=result,
+                    created_at=datetime.now(UTC).isoformat(),
+                )
+            )
+
+            return result
 
         except httpx.HTTPError:
             return ""
 
 
-    async def generate(self, prompt: str) -> str:
+    def dump(self) -> List[Message]:
         """
-        Generate using configured provider + model.
-        """
-        if not self.is_ready():
-            raise ValueError("Agent not fully configured")
-
-        return await self.generate_with_model(
-            self.provider, self.model, prompt
-        )
-
-
-    async def clear_session(self) -> None:
-        """
-        Clear current session on server.
-        """
-        if not self.session_id:
-            return
-
-        client = await self._get_client()
-
-        payload = SessionIdRequest(session_id=self.session_id)
-
-        try:
-            await client.post(
-                f"{self.api_url}/clear",
-                json=payload.model_dump(),
-            )
-        except httpx.HTTPError:
-            pass
-
-
-    async def create_session(self) -> str:
-        """
-        Create new session and store it.
-        """
-        client = await self._get_client()
-
-        try:
-            response = await client.post(f"{self.api_url}/new")
-            response.raise_for_status()
-
-            self.session_id = response.json().get("session_id")
-            return self.session_id or ""
-
-        except httpx.HTTPError:
-            return ""
+        Retrieve the entire context of the active session.
+        Includes all user, assistant, system, and tooling messages.
         
-    
-    async def get_sessions(self) -> list[str]:
+        Returns:
+            A list of messages.
         """
-        Get a list of all available sessions.
-        """
-        client = await self._get_client()
         
-        try:
-            response = await client.get(f"{self.api_url}/sessions")
-            response.raise_for_status()
-            
-            return response.json().get("sessions", [])
-        
-        except httpx.HTTPError:
-            return []
-        
-        
-    async def get_last_session(self) -> str:
-        """
-        Get the last active session.
-        """
-        client = await self._get_client()
-        
-        try:
-            response = await client.get(f"{self.api_url}/last")
-            response.raise_for_status()
-            
-            return response.json()
-        
-        except httpx.HTTPError:
-            return {"session_id": "", "name": ""}
-        
-
-    async def dump(self) -> list[dict]:
-        """
-        Get session message history.
-        """
         if not self.session_id:
             return []
 
-        client = await self._get_client()
-
         try:
-            response = await client.get(
+            r = self._client.get(
                 f"{self.api_url}/dump",
                 params={"session_id": self.session_id},
             )
-            response.raise_for_status()
-
-            return response.json().get("messages", [])
-
+            r.raise_for_status()
+            return [Message(**m) for m in r.json()]
         except httpx.HTTPError:
             return []
 
 
-    async def compact(self):
-        raise NotImplementedError
+    def close(self) -> None:
+        """
+        Close the http client.
+        """
+        
+        self._client.close()
 
 
     # ------------------------
@@ -191,6 +217,14 @@ class Agent:
     # ------------------------
 
     def is_ready(self) -> bool:
+        """
+        Determines whether or not the Agent is ready to recieve queries.
+        
+        Returns:
+            True if the Agent has been initialized with a provider, model, and active session.
+            False otherwise.
+        """
+        
         return all([self.provider, self.model, self.session_id])
 
 
@@ -199,12 +233,12 @@ class Agent:
     # ------------------------
 
     @property
-    def provider(self) -> str | None:
+    def provider(self) -> Optional[str]:
         return self._provider
 
 
     @provider.setter
-    def provider(self, provider: str | None) -> None:
+    def provider(self, provider: Optional[str]) -> None:
         if provider is not None and provider not in VALID_PROVIDERS:
             raise ValueError(f"Unsupported provider: {provider}")
         self._provider = provider
