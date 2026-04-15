@@ -86,7 +86,7 @@ class PersistentSessionManager:
         return session_repository.get(session_id)
     
     
-    def load_last_session(self) -> Session | None:
+    def load_last_session(self) -> Session:
         """
         Retrieve the last used session.
         
@@ -98,8 +98,7 @@ class PersistentSessionManager:
         
         if last_message:
             return session_repository.get(last_message.session_id)
-        session_id = self.new_session()
-        return session_repository.get(session_id)
+        return self.new_session()
     
     
     def get_sessions(self) -> list[Session]:

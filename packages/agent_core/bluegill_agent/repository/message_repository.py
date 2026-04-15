@@ -94,7 +94,7 @@ class MessageRepository(Repository[Message, int]):
             """
             SELECT id, session_id, role, content, created_at FROM messages
             WHERE session_id = ?
-            ORDER BY id DESC
+            ORDER BY created_at ASC
             LIMIT ?
             """,
             (session_id, limit)
@@ -109,7 +109,7 @@ class MessageRepository(Repository[Message, int]):
             )
             for row in rows
         ]
-   
+        
     
     def get_last(self) -> Message | None:
         """
