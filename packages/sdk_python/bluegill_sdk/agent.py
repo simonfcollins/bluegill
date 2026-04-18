@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-from typing import List, Optional
 import httpx
 
 from bluegill_sdk.schemas import (
@@ -16,19 +15,19 @@ class Agent:
     def __init__(
         self,
         api_url: str = "http://localhost:54345", # URL where the Bluegill API is running.
-        provider: Optional[str] = None,          # The model provider (e.g. "ollama")
-        model: Optional[str] = None,             # The model to use for queries (e.g. "qwen3-coder:latest")
-        session_id: Optional[str] = None,        # The ID of the active session.
-        timeout: int = 60,                       # The timeout value injected into the header of all API calls.
+        provider: str | None = None,          # The model provider (e.g. "ollama")
+        model: str | None = None,             # The model to use for queries (e.g. "qwen3-coder:latest")
+        session_id: str | None = None,        # The ID of the active session.
+        timeout: int = 180,                       # The timeout value injected into the header of all API calls.
     ) -> None:
         self.api_url = api_url.rstrip("/")
         self._provider = None
         self.provider = provider
         self.model = model
+        self._session_id = None
         self.session_id = session_id
         self.timeout = timeout
-
-        self.messages: List[Message] = []
+        self._messages: list[Message] = []
         self._client = httpx.Client(timeout=self.timeout)
 
 
@@ -36,7 +35,7 @@ class Agent:
     # Core Methods
     # ------------------------
 
-    def get_sessions(self) -> List[Session]:
+    def get_sessions(self) -> list[Session]:
         """
         Retrieve a list of available sessions.
         
@@ -63,12 +62,32 @@ class Agent:
         try:
             r = self._client.post(f"{self.api_url}/new")
             r.raise_for_status()
-            self.session_id = r.json().get("session_id")
-            self.messages = []
-            return self.session_id or ""
+            self._session_id = r.json().get("session_id")
+            self._messages = []
+            return self._session_id or ""
         except httpx.HTTPError:
             return ""
+        
+    
+    def clear_session(self) -> None:
+        """
+        Clear the context of the active session.
+        """
+        
+        if not self._session_id:
+            return
 
+        try:
+            self._client.post(
+                f"{self.api_url}/clear",
+                json=SessionIdRequest(
+                    session_id=self._session_id
+                ).model_dump(),
+            )
+            self._messages = []
+        except httpx.HTTPError:
+            pass
+        
 
     def load_last_session(self) -> None:
         """
@@ -80,53 +99,32 @@ class Agent:
             r.raise_for_status()
 
             session = Session(**r.json())
-            self.session_id = session.id
-
+            self._session_id = session.id
             self._load_conversation()
 
         except httpx.HTTPError:
             pass
-
-
+        
+        
     def _load_conversation(self) -> None:
         """
         Load the user-assistant message chain of the active session.
-        Stored by self.messages.
+        Stored by self._messages.
         """
         
-        if not self.session_id:
-            self.messages = []
+        if not self._session_id:
+            self._messages = []
             return
 
         try:
             r = self._client.get(
                 f"{self.api_url}/history",
-                params={"session_id": self.session_id},
+                params={"session_id": self._session_id},
             )
             r.raise_for_status()
-            self.messages = [Message(**m) for m in r.json()]
+            self._messages = [Message(**m) for m in r.json()]
         except httpx.HTTPError:
-            self.messages = []
-
-
-    def clear_session(self) -> None:
-        """
-        Clear the context of the active session.
-        """
-        
-        if not self.session_id:
-            return
-
-        try:
-            self._client.post(
-                f"{self.api_url}/clear",
-                json=SessionIdRequest(
-                    session_id=self.session_id
-                ).model_dump(),
-            )
-            self.messages = []
-        except httpx.HTTPError:
-            pass
+            self._messages = []
 
 
     def generate(self, prompt: str) -> str:
@@ -143,7 +141,7 @@ class Agent:
         if not self.is_ready() or not prompt:
             return ""
 
-        self.messages.append(
+        self._messages.append(
             Message(
                 role="user",
                 content=prompt,
@@ -154,7 +152,7 @@ class Agent:
         payload = GenerateRequest(
             provider=self.provider,
             model=self.model,
-            session_id=self.session_id,
+            session_id=self._session_id,
             prompt=prompt,
         )
 
@@ -167,7 +165,7 @@ class Agent:
 
             result = r.json().get("response", "")
 
-            self.messages.append(
+            self._messages.append(
                 Message(
                     role="assistant",
                     content=result,
@@ -181,7 +179,7 @@ class Agent:
             return ""
 
 
-    def dump(self) -> List[Message]:
+    def dump(self) -> list[Message]:
         """
         Retrieve the entire context of the active session.
         Includes all user, assistant, system, and tooling messages.
@@ -190,13 +188,13 @@ class Agent:
             A list of messages.
         """
         
-        if not self.session_id:
+        if not self._session_id:
             return []
 
         try:
             r = self._client.get(
                 f"{self.api_url}/dump",
-                params={"session_id": self.session_id},
+                params={"session_id": self._session_id},
             )
             r.raise_for_status()
             return [Message(**m) for m in r.json()]
@@ -225,7 +223,7 @@ class Agent:
             False otherwise.
         """
         
-        return all([self.provider, self.model, self.session_id])
+        return all([self.provider, self.model, self._session_id])
 
 
     # ------------------------
@@ -233,12 +231,44 @@ class Agent:
     # ------------------------
 
     @property
-    def provider(self) -> Optional[str]:
+    def provider(self) -> str | None:
         return self._provider
 
 
     @provider.setter
-    def provider(self, provider: Optional[str]) -> None:
+    def provider(self, provider: str | None) -> None:
+        """
+        Setter for self._provider.
+        Checks that the new provider is a valid model provider.
+        
+        Params:
+            provider - The new provider.
+        """
+        
         if provider is not None and provider not in VALID_PROVIDERS:
             raise ValueError(f"Unsupported provider: {provider}")
         self._provider = provider
+
+
+    @property
+    def session_id(self) -> str | None:
+        return self._session_id
+    
+    
+    @session_id.setter
+    def session_id(self, session_id: str | None) -> None:
+        """
+        Setter for self._session_id.
+        Sets self._session_id to new value and retrieves the session messages.
+        
+        Params:
+            session_id - The new session_id.
+        """
+        
+        self._session_id = session_id
+        self._load_conversation()
+
+    
+    @property
+    def messages(self) -> list[Session]:       
+        return self._messages
