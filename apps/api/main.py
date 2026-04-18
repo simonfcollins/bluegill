@@ -59,21 +59,43 @@ async def dump_session(session_id: str) -> list[Message]:
     
 @app.get("/history")
 async def get_conversation_history(session_id: str) -> list[Message]:
-    """
-    Returns all messages between the assistant and user.
-    """
     messages = session_manager.get_messages(session_id)
     conversation = []
+
     for m in messages:
+        if m.role == "user":
+            conversation.append(m)
+            continue
+
+        if m.role != "assistant":
+            continue
+
+        content = m.content
+
         try:
             data = json.loads(m.content)
-            has_tool = "tool" in data
-        except Exception:
-            has_tool = False
-            
-        if (m.role == "assistant" and not has_tool) or m.role == "user":
-            conversation.append(m)
-            
+
+            if isinstance(data, dict):
+                # skip tool messages
+                if "tool" in data:
+                    continue 
+
+                if "response" in data:
+                    content = data["response"]
+
+        except json.JSONDecodeError:
+            pass
+
+        conversation.append(
+            Message(
+                id=m.id,
+                session_id=m.session_id,
+                content=content,
+                role=m.role,
+                created_at=m.created_at,
+            )
+        )
+
     return conversation
     
     

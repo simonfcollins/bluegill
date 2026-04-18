@@ -43,7 +43,7 @@ class PersistentSessionManager:
         return message_repository.get_by_session_id(session_id)
 
 
-    def _add_session(self, session_id: str, name: str = "") -> None:
+    def _add_session(self, session_id: str, name: str = "New Session") -> None:
         """
         Persists a new session entity to the database.
         
