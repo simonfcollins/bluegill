@@ -8,7 +8,7 @@ from bluegill_sdk.schemas import (
     Session,
 )
 
-VALID_PROVIDERS = ["ollama"]
+VALID_PROVIDERS = [None, "ollama"]
 
 
 class Agent:
@@ -245,7 +245,7 @@ class Agent:
             provider - The new provider.
         """
         
-        if provider is not None and provider not in VALID_PROVIDERS:
+        if provider not in VALID_PROVIDERS:
             raise ValueError(f"Unsupported provider: {provider}")
         self._provider = provider
 
