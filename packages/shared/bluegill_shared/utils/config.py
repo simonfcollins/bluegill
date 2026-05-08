@@ -45,7 +45,11 @@ class Model(BaseModel):
     Represents an LLM.
     
     Attributes:
-        provider: 
+        provider: The common name of this model's provider.
+        
+        model: The name of the model (e.g. 'qwen3.5:9b').
+        
+        window: The context window size. Defaults to 8000 tokens.
     """
     
     provider: str
@@ -54,12 +58,27 @@ class Model(BaseModel):
     
     
 class Config(BaseModel):
+    """
+    Represents the global config.json file.
+    
+    Attributes:
+        workspaces: A list of user defined, Agent accessible workspaces.
+        
+        providers: A list of providers.
+        
+        Models: A list of language models.
+    """
+    
     workspaces: list[Workspace]
     providers: list[Provider]
     models: list[Model]
     
 
 def format_config_error(e: ValidationError) -> str:
+    """
+    Formats pydantic Validation Errors that result from an invalid config file.
+    """
+    
     lines = ["Invalid config file:\n"]
 
     for err in e.errors():
@@ -75,10 +94,6 @@ def format_config_error(e: ValidationError) -> str:
 def load_config() -> Config:
     """
     Loads the global config.json file located in $HOME/.bluegill.
-    
-    Returns:
-        Config:
-            A Config object including providers, models, and workspaces.
     """
     if not CONFIG_FILE.exists():
         return Config(workspaces=[], providers=[], models=[])
