@@ -1,26 +1,24 @@
 import subprocess
 from pathlib import Path
-import json
-from bluegill_sdk.utils.config import *
+from bluegill_shared.utils import *
 
 BASE_DIR = Path.home() / ".bluegill"
 BASE_DIR.mkdir(exist_ok=True)
 
 DEFAULT_WORKSPACE = BASE_DIR / "workspace"
 
-DOCKER_BASE_DIR = Path("/mnt/workspaces/")
+DOCKER_USER = "assistant"
+
+DOCKER_BASE_DIR = Path(f"/home/{DOCKER_USER}/workspaces/")
 
 DOCKER_IMAGE = "bluegill_agent:latest"
 
-def load_workspace_dirs() -> List[Path]:
+
+def load_workspace_dirs() -> list[Path]:
     cfg: Config = load_config()
         
-    workspaces = []
-    for ws in cfg["workspaces"]:
-        path = Path(ws["path"]).expanduser().resolve()
-        workspaces.append(path)
-        
-    return workspaces
+    return [Path(ws.path).expanduser().resolve() for ws in cfg.workspaces]
+
 
 def verify_docker():
     try:
@@ -105,7 +103,7 @@ def launch_agent():
     cmd = [
         "docker", "run", "--rm",
         "--network=host",
-        "-v", f"{BASE_DIR}:/home/agentuser/.bluegill",
+        "-v", f"{BASE_DIR}:/home/{DOCKER_USER}/.bluegill",
         *mounts,
         DOCKER_IMAGE
     ]

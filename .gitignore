@@ -8,8 +8,8 @@ sessions.db
 
 .env
 
+.vscode
+
 build
 
-bluegill_agent.egg-info
-
-bluegill_sdk.egg-info
+*.egg-info

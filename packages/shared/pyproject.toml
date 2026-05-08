@@ -1,0 +1,14 @@
+[project]
+name = "bluegill-shared"
+version = "0.1.0"
+description = "Shared library for the Bluegill Agent."
+dependencies = [
+    "pydantic>=2.7.4",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
