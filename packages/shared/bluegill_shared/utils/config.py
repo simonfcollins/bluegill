@@ -45,14 +45,14 @@ class Model(BaseModel):
     Represents an LLM.
     
     Attributes:
-        provider: The common name of this model's provider.
+        name: The common name of this model's provider.
         
         model: The name of the model (e.g. 'qwen3.5:9b').
         
         window: The context window size. Defaults to 8000 tokens.
     """
     
-    provider: str
+    name: str
     model: str
     window: int = 8000
     

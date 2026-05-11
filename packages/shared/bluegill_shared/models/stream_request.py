@@ -17,7 +17,7 @@ class StreamRequest(BaseModel):
         prompt: The user's prompt.
     """
     
-    provider: Literal["ollama"]
+    provider: str
     model: str
     window: int = 8000
     session_id: str
