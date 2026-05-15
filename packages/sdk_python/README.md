@@ -8,9 +8,10 @@ A lightweight Python SDK for interacting with the Bluegill API. This SDK provide
 
 * Session management (create, load, clear, list)
 * Persistent conversation history
-* Simple text generation interface
+* Streaming text generation interface
 * Provider and model configuration
 * Automatic message tracking
+* Async streaming responses
 
 ---
 
@@ -27,20 +28,26 @@ Ensure you also have access to the Bluegill API server.
 ## Quick Start
 
 ```python
+import asyncio
 from agent import Agent
 
-agent = Agent(
-    api_url="http://localhost:54345",
-    provider="ollama",
-    model="qwen3-coder:latest"
-)
+async def main():
+    agent = Agent(
+        api_url="http://localhost:54345",
+        provider="ollama",
+        model="qwen3-coder:latest"
+    )
 
-# Create a new session
-agent.new_session()
+    # Create a new session
+    agent.new_session()
 
-# Send a prompt
-response = agent.generate("Hello, how are you?")
-print(response)
+    # Stream a response
+    async for chunk in agent.chat_stream("Hello, how are you?"):
+        print(chunk.content, end="")
+
+    agent.close()
+
+asyncio.run(main())
 ```
 
 ---
@@ -49,13 +56,13 @@ print(response)
 
 ### Agent Parameters
 
-| Parameter  | Type | Description                                   |
-| ---------- | ---- | --------------------------------------------- |
-| api_url    | str  | URL of the Bluegill API                       |
+| Parameter  | Type | Description                                    |
+| ---------- | ---- | ---------------------------------------------- |
+| api_url    | str  | URL of the Bluegill API                        |
 | provider   | str  | Model provider (currently supports: `ollama`) |
-| model      | str  | Model name                                    |
-| session_id | str  | Existing session ID                           |
-| timeout    | int  | Request timeout in seconds                    |
+| model      | str  | Model name                                     |
+| session_id | str  | Existing session ID                            |
+| timeout    | int  | Request timeout in seconds                     |
 
 ---
 
@@ -101,13 +108,16 @@ agent.clear_session()
 
 ---
 
-### generate(prompt)
+### chat_stream(prompt)
 
-Send a prompt to the model and receive a response.
+Send a prompt to the model and receive a streamed response.
 
 ```python
-response = agent.generate("Explain recursion")
+async for chunk in agent.chat_stream("Explain recursion"):
+    print(chunk.content, end="")
 ```
+
+Returns an `AsyncGenerator[AgentStreamResponse, None]`.
 
 ---
 
@@ -175,25 +185,46 @@ history = agent.messages
 ## Example Workflow
 
 ```python
-agent = Agent(provider="ollama", model="qwen3-coder")
+import asyncio
+from agent import Agent
 
-agent.new_session()
-agent.generate("What is Python?")
-agent.generate("Explain it like I'm five.")
+async def main():
+    agent = Agent(provider="ollama", model="qwen3-coder")
 
-for m in agent.messages:
-    print(f"{m.role}: {m.content}\n")
+    agent.new_session()
+
+    async for chunk in agent.chat_stream("What is Python?"):
+        print(chunk.content, end="")
+
+    print("\n")
+
+    async for chunk in agent.chat_stream("Explain it like I'm five."):
+        print(chunk.content, end="")
+
+    print("\n")
+
+    for m in agent.messages:
+        print(f"{m.role}: {m.content}\n")
+
+    agent.close()
+
+asyncio.run(main())
 ```
 
 ---
 
 ## Error Handling
 
-* All HTTP errors are caught silently.
-* Failed requests return:
+* HTTP and API errors raise `AgentError`.
+* Stream validation failures emit an error event in the stream.
 
-  * Empty list `[]` for collections
-  * Empty string `""` for text responses
+Example:
+
+```python
+async for chunk in agent.chat_stream("Hello"):
+    if chunk.event == "error":
+        print("Error:", chunk.content)
+```
 
 ---
 
@@ -202,6 +233,7 @@ for m in agent.messages:
 * Ensure the Bluegill API is running before making requests.
 * Session state is maintained server-side.
 * Messages are also cached locally in the Agent instance.
+* `chat_stream()` requires an active session, provider, and model.
 
 ---
 
