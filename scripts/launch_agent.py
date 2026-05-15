@@ -108,8 +108,12 @@ def launch_agent():
         DOCKER_IMAGE
     ]
     
-    print("Launching agent:", " ".join(cmd))
-    subprocess.run(cmd)
+    try:
+        print("Launching agent:\n", " ".join(cmd))
+        subprocess.run(cmd)
+    except KeyboardInterrupt:
+        print("Agent stopped")
+    
 
 if __name__ == "__main__":
     launch_agent()

@@ -9,11 +9,12 @@ class WorkspaceProvider:
         Initialize the workspace directory, creating it if necessary.
 
         Args:
-            workspace_dir (str): Path to the workspace (supports '~').
+            workspace_dir: Path to the workspace (supports '~').
         """
         workspace = Path(workspace_dir).expanduser().resolve()
         workspace.mkdir(parents=True, exist_ok=True)
         cls._workspace_root = workspace
+        
         
     @classmethod
     def get_workspace(cls) -> Path:
@@ -21,15 +22,18 @@ class WorkspaceProvider:
         Get the workspace root path.
         
         Returns:
-            Path: Workspace root.
+            Path: 
+                The workspace root.
 
         Raises:
-            RuntimeError: If the workspace is not initialized.
+            RuntimeError: 
+                If the workspace is not initialized.
         """
         if cls._workspace_root is None:
             raise RuntimeError("WorkspaceProvider is not initialized.\n" +
                                "Use: \'WorkspaceProvider.initialize(\"workspace/path/\")\'")
         return cls._workspace_root
+    
     
     @classmethod
     def resolve(cls, *paths) -> Path:
@@ -40,7 +44,8 @@ class WorkspaceProvider:
             *paths: Path components relative to workspace.
 
         Returns:
-            Path: Absolute resolved path.
+            Path: 
+                Absolute resolved path.
 
         Example:
             config = WorkspaceProvider.resolve("configs", "settings.yaml")

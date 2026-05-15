@@ -1,7 +1,9 @@
 import sqlite3
 from pathlib import Path
-from typing import TypeVar, Generic
+from typing import Any, TypeVar, Generic
 from abc import ABC, abstractmethod
+import threading
+import time
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -11,14 +13,48 @@ BASE_DIR.mkdir(exist_ok=True)
 
 DB_PATH = BASE_DIR / "sessions.db"
 
+WRITE_LOCK = threading.Lock()
+
+
+def create_connection(db_path: Path) -> sqlite3.Connection:
+    """
+    Creates and returns a new sqlite3.Connection instance.
+    """
+    
+    conn = sqlite3.connect(
+        db_path,
+        timeout=5.0,
+        check_same_thread=True 
+    )
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def with_retry(fn, retries: int = 5) -> Any:
+    """
+    Retry wrapper for SQLite 'database is locked' errors.
+    """
+    
+    for i in range(retries):
+        try:
+            return fn()
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower():
+                time.sleep(0.05 * (i + 1))
+                continue
+            raise
+    raise sqlite3.OperationalError("SQLite retry limit exceeded")
+
+
 class Repository(Generic[T, K], ABC):
     
-    def __init__(self, db_path: Path=DB_PATH):
-        # Create DB connection
-        self.conn = sqlite3.connect(db_path, timeout = 5.0, check_same_thread = False)
-        # Enable write-ahead logging
-        self.conn.execute("PRAGMA journal_mode=WAL")
-        self.conn.execute("PRAGMA foreign_keys = ON")
+    def __init__(self, db_path: Path=DB_PATH) -> None:
+        self.db_path = db_path
+        
+    
+    def _conn(self) -> sqlite3.Connection:
+        return create_connection(self.db_path)
     
     
     @abstractmethod
