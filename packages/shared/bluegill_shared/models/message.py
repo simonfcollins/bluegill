@@ -1,6 +1,8 @@
 from typing import Literal
-
 from pydantic import BaseModel
+
+Role = Literal["user", "assistant", "tool", "system"]
+
 
 class Message(BaseModel):
     """
@@ -11,7 +13,7 @@ class Message(BaseModel):
         
         session_id: Foreign key of the session this message belongs to.
         
-        role: The source of the message ("user", "assistant", "tool", "system", "error").
+        role: The source of the message ("user", "assistant", "tool", "system").
         
         content: The content of the message such as a user prompt or assistant response.
         
@@ -20,6 +22,6 @@ class Message(BaseModel):
     
     id: int | None = None
     session_id: str | None = None
-    role: Literal["user", "assistant", "tool", "system", "error"]
+    role: Role
     content: str
     created_at: str | None = None

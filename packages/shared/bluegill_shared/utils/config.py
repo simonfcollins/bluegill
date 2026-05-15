@@ -35,7 +35,7 @@ class Provider(BaseModel):
         api_key: A personal API key token required to access the provider API.
     """
     
-    provider: str
+    name: str
     url: str
     api_key: str | None = None
     
@@ -52,8 +52,8 @@ class Model(BaseModel):
         window: The context window size. Defaults to 8000 tokens.
     """
     
+    provider: str
     name: str
-    model: str
     window: int = 8000
     
     

@@ -1,11 +1,13 @@
-from bluegill_shared.models.message import Message
+from bluegill_shared.models.message import Message, Role
 from bluegill_shared.models.session import Session
 from bluegill_shared.models.stream_request import StreamRequest
-from bluegill_shared.models.agent_stream_response import AgentStreamResponse
+from bluegill_shared.models.agent_stream_response import AgentStreamResponse, AgentEvent
 
 __all__ = [
     "Message",
     "Session",
     "StreamRequest",
-    "AgentStreamResponse"
+    "AgentStreamResponse",
+    "AgentEvent",
+    "Role"
 ]
