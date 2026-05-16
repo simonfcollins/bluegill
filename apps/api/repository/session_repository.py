@@ -31,7 +31,7 @@ class SessionRepository(Repository[Session, str]):
             with_retry(op)
 
         except sqlite3.Error as e:
-            raise RepositoryError("Failed to initialize sessions table", e)
+            raise RepositoryError("Failed to initialize sessions table") from e
         
     
     def get(self, id: str) -> Session | None:
@@ -48,7 +48,7 @@ class SessionRepository(Repository[Session, str]):
                 row = cursor.fetchone()
 
         except sqlite3.Error as e:
-            raise RepositoryError(f"Failed to fetch session '{id}'", e)
+            raise RepositoryError(f"Failed to fetch session '{id}'") from e
 
         if row is None:
             return None
@@ -69,7 +69,7 @@ class SessionRepository(Repository[Session, str]):
                 rows = cursor.fetchall()
 
         except sqlite3.Error as e:
-            raise RepositoryError("Failed to fetch all sessions", e)
+            raise RepositoryError("Failed to fetch all sessions") from e
 
         return [
             Session(id=row[0], name=row[1], created_at=row[2])
@@ -94,10 +94,41 @@ class SessionRepository(Repository[Session, str]):
             with_retry(op)
 
         except sqlite3.IntegrityError as e:
-            raise RepositoryError("Session insert violated constraints", e)
+            raise RepositoryError("Session insert violated constraints") from e
 
         except sqlite3.Error as e:
-            raise RepositoryError("Failed to insert session", e)
+            raise RepositoryError("Failed to insert session") from e
+        
+    
+    def update(self, session_id: str, name: str) -> None:
+        """
+        Update a session.
+        """
+
+        try:
+            def op() -> None:
+                with self._conn() as conn:
+                    cursor = conn.execute(
+                        "UPDATE sessions SET name = ? WHERE id = ?",
+                        (name, session_id)
+                    )
+
+                    if cursor.rowcount == 0:
+                        raise RepositoryError(
+                            f"No session found with id '{session_id}'"
+                        )
+
+                    conn.commit()
+
+            with_retry(op)
+
+        except sqlite3.IntegrityError as e:
+            raise RepositoryError(
+                "Session update violated constraints") from e
+
+        except sqlite3.Error as e:
+            raise RepositoryError(
+                "Failed to update session") from e
         
     
     def delete(self, id: str) -> None:
@@ -117,7 +148,7 @@ class SessionRepository(Repository[Session, str]):
             with_retry(op)
 
         except sqlite3.Error as e:
-            raise RepositoryError(f"Failed to delete session '{id}'", e)
+            raise RepositoryError(f"Failed to delete session '{id}'") from e
         
         
     def delete_all(self) -> None:
@@ -134,7 +165,4 @@ class SessionRepository(Repository[Session, str]):
             with_retry(op)
 
         except sqlite3.Error as e:
-            raise RepositoryError("Failed to delete all sessions", e)
-
-
-session_repository = SessionRepository()
+            raise RepositoryError("Failed to delete all sessions") from e

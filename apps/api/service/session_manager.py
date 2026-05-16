@@ -32,10 +32,10 @@ class SessionManager:
             return session
 
         except RepositoryError as e:
-            raise SessionManagerError("Failed to create new session", e)
+            raise SessionManagerError("Failed to create new session") from e
 
         except Exception as e:
-            raise SessionManagerError("Unexpected error in new_session", e)
+            raise SessionManagerError("Unexpected error in new_session") from e
     
     
     def clear_session(self, session_id: str) -> None:
@@ -84,13 +84,13 @@ class SessionManager:
             return self.new_session()
 
         except RepositoryError as e:
-            raise SessionManagerError("Failed to load last session", e)
+            raise SessionManagerError("Failed to load last session") from e
 
         except SessionManagerError:
             raise
 
         except Exception as e:
-            raise SessionManagerError("Unexpected error loading last session", e)
+            raise SessionManagerError("Unexpected error loading last session") from e
     
     
     def get_session(self, session_id: str) -> Session | None:
@@ -103,11 +103,11 @@ class SessionManager:
 
         except RepositoryError as e:
             raise SessionManagerError(
-                f"Failed to retrieve session '{session_id}'", e)
+                f"Failed to retrieve session '{session_id}'") from e
 
         except Exception as e:
             raise SessionManagerError(
-                f"Unexpected error retrieving session '{session_id}'", e)
+                f"Unexpected error retrieving session '{session_id}'") from e
     
     
     def get_sessions(self) -> list[Session]:
@@ -119,10 +119,27 @@ class SessionManager:
             return self.session_repository.get_all()
 
         except RepositoryError as e:
-            raise SessionManagerError("Failed to retrieve sessions", e)
+            raise SessionManagerError("Failed to retrieve sessions") from e
 
         except Exception as e:
-            raise SessionManagerError("Unexpected error retrieving sessions", e)
+            raise SessionManagerError("Unexpected error retrieving sessions") from e
+        
+        
+    def rename_session(self, session_id: str, name: str):
+        """
+        Rename a session.
+        """
+        
+        try:
+            self.session_repository.update(session_id, name)
+            
+        except RepositoryError as e:
+            raise SessionManagerError(
+                f"Failed to rename session '{session_id}'") from e
+
+        except Exception as e:
+            raise SessionManagerError(
+                f"Unexpected error renaming session '{session_id}'") from e
       
         
     def delete_session(self, session_id: str) -> None:
@@ -135,11 +152,11 @@ class SessionManager:
 
         except RepositoryError as e:
             raise SessionManagerError(
-                f"Failed to delete session '{session_id}'", e)
+                f"Failed to delete session '{session_id}'") from e
 
         except Exception as e:
             raise SessionManagerError(
-                f"Unexpected error deleting session '{session_id}'", e)
+                f"Unexpected error deleting session '{session_id}'") from e
     
     
     def delete_all_sessions(self) -> None:
@@ -151,10 +168,10 @@ class SessionManager:
             self.session_repository.delete_all()
 
         except RepositoryError as e:
-            raise SessionManagerError("Failed to delete all sessions", e)
+            raise SessionManagerError("Failed to delete all sessions") from e
 
         except Exception as e:
-            raise SessionManagerError("Unexpected error deleting all sessions", e)
+            raise SessionManagerError("Unexpected error deleting all sessions") from e
         
         
     def add_message(self, session_id: str, role: str, content: str) -> bool:
@@ -176,11 +193,11 @@ class SessionManager:
 
         except RepositoryError as e:
             raise SessionManagerError(
-                f"Failed to add message to session '{session_id}'", e)
+                f"Failed to add message to session '{session_id}'") from e
 
         except Exception as e:
             raise SessionManagerError(
-                f"Unexpected error adding message to session '{session_id}'", e)
+                f"Unexpected error adding message to session '{session_id}'") from e
 
     
     
@@ -193,16 +210,15 @@ class SessionManager:
             self.message_repository.insert_all(messages)
 
         except RepositoryError as e:
-            raise SessionManagerError("Failed to add messages", e)
+            raise SessionManagerError("Failed to add messages") from e
 
         except Exception as e:
-            raise SessionManagerError("Unexpected error adding messages", e)
+            raise SessionManagerError("Unexpected error adding messages") from e
 
 
     def get_messages(self, session_id: str) -> list[Message]:
         """
         Get all messages from a given session.
-
         """
         
         try:
@@ -210,11 +226,11 @@ class SessionManager:
 
         except RepositoryError as e:
             raise SessionManagerError(
-                f"Failed to get messages for session '{session_id}'", e)
+                f"Failed to get messages for session '{session_id}'") from e
 
         except Exception as e:
             raise SessionManagerError(
-                f"Unexpected error getting messages for session '{session_id}'", e)
+                f"Unexpected error getting messages for session '{session_id}'") from e
         
         
     def _add_session(self, session_id: str, name: str = "New Session") -> None:
@@ -232,8 +248,8 @@ class SessionManager:
 
         except RepositoryError as e:
             raise SessionManagerError(
-                f"Failed to create session '{session_id}'", e)
+                f"Failed to create session '{session_id}'") from e
 
         except Exception as e:
             raise SessionManagerError(
-                f"Unexpected error creating session '{session_id}'", e)
+                f"Unexpected error creating session '{session_id}'") from e

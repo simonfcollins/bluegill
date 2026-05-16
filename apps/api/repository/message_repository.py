@@ -250,4 +250,3 @@ class MessageRepository(Repository[Message, int]):
             raise RepositoryError(
                 f"Failed to delete messages for session '{session_id}'", e)
     
-message_repository = MessageRepository()

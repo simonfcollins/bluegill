@@ -1,17 +1,18 @@
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, AsyncIterator, Callable
+from typing import AsyncIterator
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
-
-from bluegill_agent import run_agent, WorkspaceProvider, InvalidProviderError, MIN_WINDOW, ProviderFactory
-
+from bluegill_agent import WorkspaceProvider
 from bluegill_shared.models import Message, Session, StreamRequest, AgentStreamResponse
 
-from api.util.logger import get_logger
 from api.service.session_manager import SessionManager
+from api.service.agent_service import AgentService
 from api.repository.message_repository import MessageRepository
 from api.repository.session_repository import SessionRepository
 from api.exception.session_manager_exception import SessionManagerError
+from api.exception.agent_service_exception import AgentServiceError
+from api.validation.validate_stream_request import validate_stream_request
+from api.helper.try_session_manager import try_session_manager
 
 
 @asynccontextmanager
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     
     WorkspaceProvider.initialize("~/workspaces")
     app.state.session_manager = SessionManager(SessionRepository(), MessageRepository())
+    app.state.agent_service = AgentService(app.state.session_manager)
     
     yield
     
@@ -36,102 +38,35 @@ async def stream(payload: StreamRequest, request: Request) -> StreamingResponse:
     """
     
     sm = request.app.state.session_manager
-    logger = get_logger(payload.session_id)
+    agent_service = request.app.state.agent_service
+    
+    await validate_stream_request(payload, sm)
+
+    try:
+        return StreamingResponse(await agent_service.chat_stream(payload), media_type="application/x-ndjson")
+    
+    except AgentServiceError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/generate")
+async def generate(payload: StreamRequest, request: Request) -> AgentStreamResponse:
+    """
+    Generates a single response with the given prompt and model/provider.
+    """
+    
+    sm = request.app.state.session_manager
+    agent_service = request.app.state.agent_service
+    
+    await validate_stream_request(payload, sm)
     
     try:
-        # verify session exists
-        if not sm.get_session(payload.session_id):
-            raise HTTPException(
-                status_code=404, 
-                detail=f"session does not exist with id '{payload.session_id}'"
-            )
-    except SessionManagerError as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        response = await agent_service.generate(payload)
+        return response
     
-    if payload.window < MIN_WINDOW:
-        raise HTTPException(
-            status_code=400,
-            detail=f"context window must be >= {MIN_WINDOW}"
-        )
-        
-    if not payload.prompt or not payload.prompt.strip():
-        raise HTTPException(
-            status_code=422,
-            detail="prompt cannot be an empty string"
-        )
-        
-    try:
-        provider = ProviderFactory.get_provider(payload.provider)
-    except InvalidProviderError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"'{payload.provider}' is not a valid provider"
-        )
-        
-    if not await provider.model_exists(payload.model):
-        raise HTTPException(
-            status_code=404,
-            detail=f"model '{payload.model}' not found"
-        )
+    except AgentServiceError as e:
+        raise HTTPException(status_code=500, detail=str(e))
     
-    try:
-        # add user prompt to the session
-        sm.add_message(
-            session_id=payload.session_id,
-            role="user",
-            content=payload.prompt
-        )
-        logger.info(f"[USER] {payload.prompt}")
-        messages = sm.get_messages(payload.session_id)
-    except SessionManagerError as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
-    
-    # stream generator function
-    async def generator() -> AsyncGenerator[str, None]:
-        async for chunk in run_agent( # run the agent
-            payload.provider, 
-            payload.model,
-            messages,
-            payload.window
-        ):
-            if chunk.event == "error":
-                logger.error(f"[ERROR] {chunk.content}")
-
-            if chunk.done and chunk.context: # if stream is done...
-                new_messages = []
-                for m in chunk.context[1]: # collect new messages
-                    new_messages.append(Message(
-                        role=m.role, 
-                        content=m.content, 
-                        session_id=payload.session_id
-                    ))
-                    # log conversation
-                    log = logger.warning if m.role == "system" else logger.info
-                    log(f"[{m.role.capitalize()}] {m.content}")
-
-                if len(new_messages):
-                    try:
-                        # add new messages to session
-                        sm.add_messages(new_messages)
-                    except SessionManagerError as e:
-                        logger.error(f"[ERROR] Failed to add new context to session")
-                        
-                        yield AgentStreamResponse(
-                            event="error",
-                            content=f"Failed to add new context to session: {e}"
-                        ).model_dump_json(exclude_none=True) + "\n"
-            
-            # yield the agent response
-            yield chunk.model_dump_json(exclude_none=True) + "\n"
-
-    return StreamingResponse(generator(), media_type="application/x-ndjson")
-
 
 @app.post("/new")
 async def create_session(request: Request) -> dict[str, str]:
@@ -202,16 +137,4 @@ async def get_last_session(request: Request) -> Session:
     sm = request.app.state.session_manager
     
     return try_session_manager(sm.load_last_session)
-
-
-def try_session_manager(fun: Callable[..., Any], **xargs: Any) -> Any:
-    """
-    Helper function that trys executing the given SessionManager method.
-    Raises a FastAPI HTTPException if fun raises an error.
-    """
-    
-    try:
-        return fun(**xargs)
-    except SessionManagerError as e:
-        raise HTTPException(status_code=500, detail=str(e))
         
