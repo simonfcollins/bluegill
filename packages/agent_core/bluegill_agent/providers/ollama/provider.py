@@ -48,13 +48,13 @@ class LocalOllamaProvider(BaseLLMProvider):
             response.raise_for_status()
             
             try:    
-                return OllamaStreamResponse(**response.json()).to_llm_stream_response()
+                return OllamaStreamResponse.model_validate_json(response.text).to_llm_stream_response()
             except ValidationError:
                 return LLMStreamResponse(
                     model=model,
                     done=True,
                     created_at=datetime.now(UTC).isoformat(),
-                    response=response.text
+                    response=f"Unexpected response from provider: '{response.text}'"
                 )
         
         
@@ -87,14 +87,7 @@ class LocalOllamaProvider(BaseLLMProvider):
                             continue
 
                         try:
-                            data = json.loads(line)
-                            yield OllamaStreamResponse.model_validate(data).to_llm_stream_response()
-                        except json.JSONDecodeError:
-                            yield LLMStreamResponse(
-                                model=model,
-                                created_at=datetime.now(UTC).isoformat(),
-                                response=f"failed to parse response from provider. response: '{line}'"
-                            )
+                            yield OllamaStreamResponse.model_validate_json(line).to_llm_stream_response()
                         except ValidationError:
                             yield LLMStreamResponse(
                                 model=model,
@@ -126,5 +119,3 @@ class LocalOllamaProvider(BaseLLMProvider):
             models = data.get("models", [])
             
             return any(m.get("name") == model for m in models)
-
-
