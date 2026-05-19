@@ -16,12 +16,14 @@ class Agent:
         api_url: str = "http://localhost:54345", # URL where the Bluegill API is running.
         provider: str | None = None,             # The model provider (e.g. "ollama")
         model: str | None = None,                # The model to use for queries (e.g. "qwen3-coder:latest")
+        window: int = 8000,                      # The maximum input context window size.
         session_id: str | None = None,           # The ID of the active session.
         timeout: int = 20,                       # The timeout value injected into the header of all API calls.
     ) -> None:
         self.api_url = api_url.rstrip("/")
         self.provider = provider
         self.model = model
+        self.window = window
         self._session_id = None
         self.session_id = session_id
         self.timeout = timeout
@@ -142,7 +144,7 @@ class Agent:
         payload = StreamRequest(
             provider=self.provider,
             model=self.model,
-            window=256000,
+            window=self.window,
             session_id=self._session_id,
             prompt=prompt
         )
