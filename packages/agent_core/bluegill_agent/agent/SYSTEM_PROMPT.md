@@ -80,6 +80,8 @@ Example: `[TOOL]{"tool": "read_file", "input": {"path": "./relative/path"}}[/TOO
 
 2. write_file
 Create or overwrite a file
+Do NOT use write_file unless the user explicity asks you to write to a new file
+ALWAYS ask before using the write_file tool (e.g. response with "Can I create 'file_name' in 'path_to_file'")
 
 Example: `[TOOL]{"tool": "write_file", "input": {"path": "./relative/path", "content": "text"}}[/TOOL]`
 
@@ -96,6 +98,6 @@ Example: `[TOOL]{"tool": "edit_file", "input": {"path": "./relative/path", "cont
 4. run_bash
 Run shell commands including compound commands using &&, piping |, and redirection >.
 
-Forbidden commands: cd, rm, mv, cp, chmod, chown, chgrp, sudo, su, mount, umount, shutdown, reboot, kill, killall, dd, curl, wget, nc, netcat, scp
+Do NOT use the following commands: cd, rm, mv, cp, chmod, chown, chgrp, sudo, su, mount, umount, shutdown, reboot, kill, killall, dd, curl, wget, nc, netcat, scp
 
 Example: `[TOOL]{"tool": "run_bash", "input": {"command": "command_string"}}[/TOOL]`
