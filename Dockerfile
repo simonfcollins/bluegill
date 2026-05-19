@@ -14,6 +14,10 @@ RUN pip install ./packages/agent_core
 COPY apps/api ./api
 ENV PYTHONPATH=/app
 
+RUN mkdir -p /home/assistant/workspaces && \
+    chown root:root /home/assistant/workspaces && \
+    chmod 0555 /home/assistant/workspaces
+
 RUN useradd -m assistant
 USER assistant
 WORKDIR /home/assistant/workspaces
