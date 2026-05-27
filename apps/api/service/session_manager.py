@@ -1,5 +1,5 @@
 import uuid
-from bluegill_shared.models import Session, Message
+from bluegill_shared.models import Session, Message, Role
 
 from api.repository.message_repository import MessageRepository
 from api.repository.session_repository import SessionRepository
@@ -69,7 +69,7 @@ class SessionManager:
         try:
             last_message = self.message_repository.get_last()
 
-            if last_message:
+            if last_message and last_message.session_id:
                 session = self.session_repository.get(last_message.session_id)
 
                 if session:
@@ -125,21 +125,39 @@ class SessionManager:
             raise SessionManagerError("Unexpected error retrieving sessions") from e
         
         
-    def rename_session(self, session_id: str, name: str):
+    def update_session(self, session_id: str, name: str | None = None, tokens_used: int | None = None) -> None:
         """
         Rename a session.
         """
+
+        if not name and not tokens_used:
+            return
+
+        try:
+            session = self.session_repository.get(session_id)
+
+        except RepositoryError as e:
+            raise SessionManagerError("Error updating session '{session_id}'") from e
+        
+        if not session:
+            return
+        
+        updated_session = Session(
+            id=session_id,
+            name=name if name else session.name,
+            tokens_used=tokens_used if tokens_used else session.tokens_used
+        )
         
         try:
-            self.session_repository.update(session_id, name)
+            self.session_repository.update(updated_session)
             
         except RepositoryError as e:
             raise SessionManagerError(
-                f"Failed to rename session '{session_id}'") from e
+                f"Failed to update session '{session_id}'") from e
 
         except Exception as e:
             raise SessionManagerError(
-                f"Unexpected error renaming session '{session_id}'") from e
+                f"Unexpected error updating session '{session_id}'") from e
       
         
     def delete_session(self, session_id: str) -> None:
@@ -174,7 +192,7 @@ class SessionManager:
             raise SessionManagerError("Unexpected error deleting all sessions") from e
         
         
-    def add_message(self, session_id: str, role: str, content: str) -> bool:
+    def add_message(self, session_id: str, role: Role, content: str) -> bool:
         """
         Add a Message to SessionManager.
         """
@@ -233,7 +251,7 @@ class SessionManager:
                 f"Unexpected error getting messages for session '{session_id}'") from e
         
         
-    def _add_session(self, session_id: str, name: str = "New Session") -> None:
+    def _add_session(self, session_id: str, name: str = "New Session", tokens_used: int = 0) -> None:
         """
         Persists a new session entity to the database.
         """
@@ -242,7 +260,8 @@ class SessionManager:
             self.session_repository.insert(
                 Session(
                     id=session_id,
-                    name=name
+                    name=name,
+                    tokens_used=tokens_used
                 )
             )
 

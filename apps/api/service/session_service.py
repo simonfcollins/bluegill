@@ -22,7 +22,7 @@ async def rename_session(provider: str, model: str, window: int, session_id: str
     
     if response.response:
         try_session_manager(
-            sm.rename_session, 
+            sm.update_session, 
             session_id=session_id, 
             name=response.response
         )

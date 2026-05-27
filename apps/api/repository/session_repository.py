@@ -23,6 +23,7 @@ class SessionRepository(Repository[Session, str]):
                         CREATE TABLE IF NOT EXISTS sessions (
                             id TEXT PRIMARY KEY,
                             name TEXT,
+                            tokens_used INTEGER,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         )
                     """)
@@ -42,7 +43,7 @@ class SessionRepository(Repository[Session, str]):
         try:
             with self._conn() as conn:
                 cursor = conn.execute(
-                    "SELECT id, name, created_at FROM sessions WHERE id = ?",
+                    "SELECT id, name, tokens_used, created_at FROM sessions WHERE id = ?",
                     (id,)
                 )
                 row = cursor.fetchone()
@@ -53,7 +54,7 @@ class SessionRepository(Repository[Session, str]):
         if row is None:
             return None
 
-        return Session(id=row[0], name=row[1], created_at=row[2])
+        return Session(id=row[0], name=row[1], tokens_used=row[2], created_at=row[3])
         
         
     def get_all(self) -> list[Session]:
@@ -64,7 +65,7 @@ class SessionRepository(Repository[Session, str]):
         try:
             with self._conn() as conn:
                 cursor = conn.execute(
-                    "SELECT id, name, created_at FROM sessions"
+                    "SELECT id, name, tokens_used, created_at FROM sessions"
                 )
                 rows = cursor.fetchall()
 
@@ -72,7 +73,7 @@ class SessionRepository(Repository[Session, str]):
             raise RepositoryError("Failed to fetch all sessions") from e
 
         return [
-            Session(id=row[0], name=row[1], created_at=row[2])
+            Session(id=row[0], name=row[1], tokens_used=row[2], created_at=row[3])
             for row in rows
         ]
         
@@ -86,8 +87,8 @@ class SessionRepository(Repository[Session, str]):
             def op() -> None:
                 with self._conn() as conn:
                     conn.execute(
-                        "INSERT INTO sessions (id, name) VALUES (?, ?)",
-                        (entity.id, entity.name)
+                        "INSERT INTO sessions (id, tokens_used, name) VALUES (?, ?)",
+                        (entity.id, entity.tokens_used, entity.name)
                     )
                     conn.commit()
 
@@ -100,7 +101,7 @@ class SessionRepository(Repository[Session, str]):
             raise RepositoryError("Failed to insert session") from e
         
     
-    def update(self, session_id: str, name: str) -> None:
+    def update(self, entity: Session) -> None:
         """
         Update a session.
         """
@@ -109,13 +110,13 @@ class SessionRepository(Repository[Session, str]):
             def op() -> None:
                 with self._conn() as conn:
                     cursor = conn.execute(
-                        "UPDATE sessions SET name = ? WHERE id = ?",
-                        (name, session_id)
+                        "UPDATE sessions SET name = ?, tokens_used = ? WHERE id = ?",
+                        (entity.name, entity.tokens_used, entity.id)
                     )
 
                     if cursor.rowcount == 0:
                         raise RepositoryError(
-                            f"No session found with id '{session_id}'"
+                            f"No session found with id '{entity.id}'"
                         )
 
                     conn.commit()

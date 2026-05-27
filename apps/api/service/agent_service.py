@@ -22,6 +22,9 @@ class AgentService():
             
         except SessionManagerError as e:
             raise AgentServiceError(str(e)) from e
+        
+        if not session:
+            raise AgentServiceError(f"Session not found with id '{payload.session_id}'")
     
         try:
             # add user prompt to the session
@@ -92,6 +95,12 @@ class AgentService():
                 context=([m.model_dump() for m in messages],  [])
             )
         
+        if response.token_count:
+            self._sm.update_session(
+                session_id=payload.session_id, 
+                tokens_used=response.token_count
+            )
+        
         return AgentStreamResponse(
             event="generate",
             done=True,
@@ -114,30 +123,35 @@ class AgentService():
             if chunk.event == "error":
                 logger.error(f"[ERROR] {chunk.content}")
 
-            if chunk.done and chunk.context: # if stream is done...
-                new_messages = []
-                for m in chunk.context[1]: # collect new messages
-                    new_messages.append(Message(
-                        role=m.role, 
-                        content=m.content, 
-                        session_id=payload.session_id
-                    ))
-                    # log conversation
-                    log = logger.warning if m.role == "system" else logger.info
-                    log(f"[{m.role.capitalize()}] {m.content}")
+            if chunk.done: # if stream is done...
+                if chunk.context:
+                    new_messages = []
+                    for m in chunk.context[1]: # collect new messages
+                        new_messages.append(Message(
+                            role=m.role, 
+                            content=m.content, 
+                            session_id=payload.session_id
+                        ))
+                        # log conversation
+                        log = logger.warning if m.role == "system" else logger.info
+                        log(f"[{m.role.capitalize()}] {m.content}")
 
-                if len(new_messages):
-                    try:
-                        # add new messages to session
-                        self._sm.add_messages(new_messages)
-                    except SessionManagerError as e:
-                        logger.error(f"[ERROR] Failed to add new context to session")
-                        
-                        yield AgentStreamResponse(
-                            event="error",
-                            content=f"Failed to add new context to session: {e}"
-                        ).model_dump_json(exclude_none=True) + "\n"
+                    if len(new_messages):
+                        try:
+                            # add new messages to session
+                            self._sm.add_messages(new_messages)
+                        except SessionManagerError as e:
+                            logger.error(f"[ERROR] Failed to add new context to session")
+
+                            yield AgentStreamResponse(
+                                event="error",
+                                content=f"Failed to add new context to session: {e}"
+                            ).model_dump_json(exclude_none=True) + "\n"
+                if chunk.token_count:
+                    self._sm.update_session(
+                        session_id=payload.session_id, 
+                        tokens_used=chunk.token_count
+                    )
             
             # yield the agent response
             yield chunk.model_dump_json(exclude_none=True) + "\n"
-

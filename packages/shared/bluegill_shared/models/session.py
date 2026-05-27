@@ -9,10 +9,13 @@ class Session(BaseModel):
 
         name: A descriptive name for the session.
 
+        tokens_used: The number of tokens in all messages + system prompt belonging to this session.
+
         created_at: Timestamp generated at time of row insertion.
     """
     
     id: str
     name: str
+    tokens_used: int
     created_at: str | None= None
     
