@@ -87,8 +87,8 @@ class SessionRepository(Repository[Session, str]):
             def op() -> None:
                 with self._conn() as conn:
                     conn.execute(
-                        "INSERT INTO sessions (id, tokens_used, name) VALUES (?, ?)",
-                        (entity.id, entity.tokens_used, entity.name)
+                        "INSERT INTO sessions (id, name, tokens_used) VALUES (?, ?, ?)",
+                        (entity.id, entity.name, entity.tokens_used)
                     )
                     conn.commit()
 

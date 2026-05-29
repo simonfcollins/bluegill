@@ -7,9 +7,6 @@ from bluegill_shared.models import *
 from bluegill_sdk.exception import AgentError
 
 
-VALID_PROVIDERS = [None, "ollama"]
-
-
 class Agent:
     def __init__(
         self,
@@ -24,28 +21,34 @@ class Agent:
         self.provider = provider
         self.model = model
         self.window = window
-        self._session_id = None
-        self.session_id = session_id
-        self.timeout = timeout
+        self._session_id = session_id
+        self.tokens_used = 0
         self._messages: list[Message] = []
+        self.timeout = timeout
         self._client = httpx.Client(timeout=self.timeout)
+        
+        if session_id:
+            self.load_session(session_id)
 
 
     def new_session(self) -> str:
         """
-        Creat a new session and set it as the current session.
+        Create a new session and set it as the current session.
         Returns the ID of the new session.
         """
         
         try:
-            response = self._client.post(f"{self.api_url}/new")
+            response = self._client.post(f"{self.api_url}/sessions")
             response.raise_for_status()
-            self._session_id = response.json().get("session_id")
+            
+            session = Session.model_validate(response.json())
+            self._session_id = session.id
+            self.tokens_used = 0
             self._messages = []
             
             return self._session_id or ""
         
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, ValidationError) as e:
             raise AgentError("error creating new session", e)
         
     
@@ -58,14 +61,40 @@ class Agent:
             return
 
         try:
-            self._client.post(
-                f"{self.api_url}/clear",
-                params={"session_id": self.session_id}
-            )
+            response = self._client.post(f"{self.api_url}/sessions/{self.session_id}/clear")
+            response.raise_for_status()
+            
+            self.tokens_used = 0
             self._messages = []
             
         except httpx.HTTPError as e:
             raise AgentError(f"error clearing session '{self.session_id}'", e)
+        
+    
+    def load_session(self, session_id: str) -> bool:
+        """
+        Load a session by session ID.
+        """
+        
+        if not session_id: 
+            return False
+        
+        try:
+            response = self._client.get(f"{self.api_url}/sessions/{session_id}")
+            response.raise_for_status()
+            
+            session = Session.model_validate(response.json())
+            
+            if session.id != session_id:
+                return False
+            
+            self._session_id = session_id
+            self.tokens_used = session.tokens_used
+            self._load_messages()
+            return True
+            
+        except (httpx.HTTPError, ValidationError) as e:
+            raise AgentError("error loading session", e)
         
 
     def load_last_session(self) -> None:
@@ -74,18 +103,18 @@ class Agent:
         """
         
         try:
-            r = self._client.get(f"{self.api_url}/last")
-            r.raise_for_status()
+            response = self._client.get(f"{self.api_url}/sessions/last")
+            response.raise_for_status()
 
-            session = Session(**r.json())
+            session = Session.model_validate(response.json())
             self._session_id = session.id
-            self._load_conversation()
+            self.tokens_used = session.tokens_used
+            self._load_messages()
 
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, ValidationError) as e:
             raise AgentError("error loading last session", e)
             
         
-    
     def get_sessions(self) -> list[Session]:
         """
         Retrieve a list of available sessions.
@@ -95,37 +124,36 @@ class Agent:
             r = self._client.get(f"{self.api_url}/sessions")
             r.raise_for_status()
             
-            return [Session(**s) for s in r.json()]
+            return [Session.model_validate(s) for s in r.json()]
         
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, ValidationError) as e:
             raise AgentError("error retrieving session list", e)
 
 
-    def dump(self) -> list[Message]:
+    def dump(self, session_id: str | None) -> list[Message]:
         """
         Retrieve the entire context of the active session.
         Includes all user, assistant, system, and tooling messages.
         """
         
-        if not self._session_id:
+        if not session_id:
             return []
 
         try:
             r = self._client.get(
-                f"{self.api_url}/dump",
-                params={"session_id": self._session_id},
+                f"{self.api_url}/sessions/{session_id}/dump",
             )
             r.raise_for_status()
             
-            return [Message(**m) for m in r.json()]
+            return [Message.model_validate(m) for m in r.json()]
 
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, ValidationError) as e:
             raise AgentError("error retrieving session message dump", e)
 
 
     def is_ready(self) -> bool:
         """
-        Determines whether or not the Agent is ready to recieve queries.
+        Determines whether or not the Agent is ready to receive queries.
         True if the Agent has been initialized with a provider, model, and active session.
         False otherwise.
         """
@@ -181,7 +209,7 @@ class Agent:
                             content=line
                         )
         
-        self._load_conversation()
+        self.load_session(self.session_id)
     
 
     def close(self) -> None:
@@ -211,12 +239,16 @@ class Agent:
             session_id - The new session_id.
         """
         
-        self._session_id = session_id
-        self._load_conversation()
+        if session_id:
+            self.load_session(session_id)
+        else:
+            self._session_id = None
+            self._messages = []
+            self.tokens_used = 0
 
     
     @property
-    def messages(self) -> list[Session]:       
+    def messages(self) -> list[Message]:       
         return self._messages
     
     
@@ -224,23 +256,11 @@ class Agent:
     # Internal
     # ------------------------
     
-    def _load_conversation(self) -> None:
+    def _load_messages(self) -> None:
         """
-        Load the user-assistant message chain of the active session.
+        Load the message chain of the active session.
         Stored by self._messages.
         """
         
-        if not self._session_id:
-            self._messages = []
-            return
-
-        try:
-            r = self._client.get(
-                f"{self.api_url}/dump",
-                params={"session_id": self._session_id},
-            )
-            r.raise_for_status()
-            self._messages = [Message.model_validate(m) for m in r.json()]
-            
-        except httpx.HTTPError as e:
-            raise AgentError("error loading conversation", e)
+        self._messages = self.dump(self.session_id)
+        

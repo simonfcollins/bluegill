@@ -147,7 +147,7 @@ class AgentService():
                                 event="error",
                                 content=f"Failed to add new context to session: {e}"
                             ).model_dump_json(exclude_none=True) + "\n"
-                if chunk.token_count:
+                if chunk.token_count is not None:
                     self._sm.update_session(
                         session_id=payload.session_id, 
                         tokens_used=chunk.token_count

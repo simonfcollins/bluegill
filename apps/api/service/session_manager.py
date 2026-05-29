@@ -46,18 +46,17 @@ class SessionManager:
         
         try:
             self.message_repository.delete_by_session_id(session_id)
+            self.update_session(session_id=session_id, tokens_used=0)
 
         except RepositoryError as e:
-            raise SessionManagerError(
-                f"Failed to clear session '{session_id}'",
-                e
-            )
-
+            raise SessionManagerError(f"Failed to clear session '{session_id}'", e)
+        
+        except SessionManagerError as e:
+            raise e
+        
         except Exception as e:
-            raise SessionManagerError(
-                f"Unexpected error clearing session '{session_id}'",
-                e
-            )
+            raise SessionManagerError(f"Unexpected error clearing session '{session_id}'", e)
+    
 
     
     def load_last_session(self) -> Session:
@@ -130,22 +129,22 @@ class SessionManager:
         Rename a session.
         """
 
-        if not name and not tokens_used:
+        if name is None and tokens_used is None:
             return
 
         try:
             session = self.session_repository.get(session_id)
 
         except RepositoryError as e:
-            raise SessionManagerError("Error updating session '{session_id}'") from e
+            raise SessionManagerError(f"Error updating session '{session_id}'") from e
         
         if not session:
             return
         
         updated_session = Session(
             id=session_id,
-            name=name if name else session.name,
-            tokens_used=tokens_used if tokens_used else session.tokens_used
+            name=name if name is not None else session.name,
+            tokens_used=tokens_used if tokens_used is not None else session.tokens_used
         )
         
         try:
@@ -198,20 +197,17 @@ class SessionManager:
         """
         
         try:
-            if self.session_repository.get(session_id):
-                self.message_repository.insert(
-                    Message(
-                        session_id=session_id,
-                        role=role,
-                        content=content
-                    )
+            self.message_repository.insert(
+                Message(
+                    session_id=session_id,
+                    role=role,
+                    content=content
                 )
-                return True
-            return False
+            )
+            return True
 
         except RepositoryError as e:
-            raise SessionManagerError(
-                f"Failed to add message to session '{session_id}'") from e
+            return False
 
         except Exception as e:
             raise SessionManagerError(

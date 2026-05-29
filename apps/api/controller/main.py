@@ -67,21 +67,57 @@ async def generate(payload: StreamRequest, request: Request) -> AgentStreamRespo
     except AgentServiceError as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+    
+@app.get("/sessions")
+async def get_sessions(request: Request) -> list[Session]:
+    """
+    Returns a list of all session IDs.
+    """
+    
+    sm = request.app.state.session_manager
 
-@app.post("/new")
-async def create_session(request: Request) -> dict[str, str]:
+    return try_session_manager(sm.get_sessions)
+
+
+@app.get("/sessions/last")
+async def get_last_session(request: Request) -> Session:
+    """
+    Returns the last active session.
+    """
+    
+    sm = request.app.state.session_manager
+    
+    return try_session_manager(sm.load_last_session)
+
+
+@app.get("/sessions/{session_id}")
+async def get_session(session_id: str, request: Request) -> Session:
+    """
+    Get a session by session ID.
+    """
+    
+    sm = request.app.state.session_manager
+    
+    session = try_session_manager(sm.get_session, session_id=session_id)
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    return session
+    
+
+@app.post("/sessions")
+async def create_session(request: Request) -> Session:
     """
     Create a new session and return the session_id.
     """
     
     sm = request.app.state.session_manager
     
-    session = try_session_manager(sm.new_session)
-        
-    return {"session_id": session.id}
+    return try_session_manager(sm.new_session)
 
 
-@app.post("/clear")
+@app.post("/sessions/{session_id}/clear")
 async def clear_session(session_id: str, request: Request) -> dict[str, str]:
     """
     Clears the current session context.
@@ -95,18 +131,7 @@ async def clear_session(session_id: str, request: Request) -> dict[str, str]:
     return {"status": "Session cleared"}
 
 
-@app.post("/compact")
-async def compact(session_id: str, request: Request) -> dict[str, str]:
-    """
-    Compact the current session context.
-    """
-    
-    sm = request.app.state.session_manager
-    
-    raise HTTPException(status_code=501, detail="Not implemented")
-
-
-@app.get("/dump")
+@app.get("/sessions/{session_id}/dump")
 async def dump_session(session_id: str, request: Request) -> list[Message]:
     """
     Returns the specified sessions message chain.
@@ -115,26 +140,15 @@ async def dump_session(session_id: str, request: Request) -> list[Message]:
     sm = request.app.state.session_manager
     
     return try_session_manager(sm.get_messages, session_id=session_id)
-    
-    
-@app.get("/sessions")
-async def get_sessions(request: Request) -> list[Session]:
-    """
-    Returns a list of all session IDs.
-    """
-    
-    sm = request.app.state.session_manager
-
-    return try_session_manager(sm.get_sessions)
 
 
-@app.get("/last")
-async def get_last_session(request: Request) -> Session:
+@app.post("/sessions/{session_id}/compact")
+async def compact(session_id: str, request: Request) -> dict[str, str]:
     """
-    Returns the last active session.
+    Compact the current session context.
     """
     
     sm = request.app.state.session_manager
     
-    return try_session_manager(sm.load_last_session)
+    raise HTTPException(status_code=501, detail="Not implemented")
         
