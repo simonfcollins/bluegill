@@ -1,6 +1,6 @@
 from pathlib import Path
 import json
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, Field
 
 
 BASE_DIR = Path.home() / ".bluegill"
@@ -57,6 +57,31 @@ class Model(BaseModel):
     window: int = 8000
     
     
+class Compact(BaseModel):
+    """
+    Represents compaction behavior of the agent.
+    
+    Attributes:
+        enabled: True for automatic compaction of the session context.
+        
+        threshold: The percentage of context usage at which to trigger compaction.
+    """
+    
+    enabled: bool = True
+    threshold: float = 0.9
+
+
+class Agent(BaseModel):
+    """
+    Represents attributes and functionality of the agent.
+    
+    Attributes:
+        compact: A Compact object containing compaction behavior.
+    """
+    
+    compact: Compact = Field(default_factory=Compact)
+    
+        
 class Config(BaseModel):
     """
     Represents the global config.json file.
@@ -69,9 +94,10 @@ class Config(BaseModel):
         Models: A list of language models.
     """
     
-    workspaces: list[Workspace]
-    providers: list[Provider]
-    models: list[Model]
+    workspaces: list[Workspace] = []
+    providers: list[Provider] = []
+    models: list[Model] = []
+    agent: Agent = Field(default_factory=Agent)
     
 
 def format_config_error(e: ValidationError) -> str:
@@ -96,7 +122,7 @@ def load_config() -> Config:
     Loads the global config.json file located in $HOME/.bluegill.
     """
     if not CONFIG_FILE.exists():
-        return Config(workspaces=[], providers=[], models=[])
+        return Config()
 
     with CONFIG_FILE.open("r") as f:
         data = json.load(f)
