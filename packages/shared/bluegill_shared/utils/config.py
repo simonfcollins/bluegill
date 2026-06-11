@@ -14,11 +14,14 @@ class Workspace(BaseModel):
     Represents a workspace on the user's local machine that can be accessed by the Agent.
     
     Attributes:
+        id: A unique identifier for this workspace. 
+
         name: The name of the workspace. Can be anything.
         
         path: The absolute path to the workspace directory on the host machine.
     """
     
+    id: str
     name: str
     path: str
 
@@ -87,16 +90,18 @@ class Config(BaseModel):
     Represents the global config.json file.
     
     Attributes:
-        workspaces: A list of user defined, Agent accessible workspaces.
+        workspaces: A dict of user defined, Agent accessible workspaces.
         
-        providers: A list of providers.
+        providers: A dict of providers.
         
-        Models: A list of language models.
+        models: A dict of language models.
+
+        agent: An Agent.
     """
     
-    workspaces: list[Workspace] = []
-    providers: list[Provider] = []
-    models: list[Model] = []
+    workspaces: dict[str, Workspace] = {}
+    providers: dict[str, Provider] = {}
+    models: dict[str, Model] = {}
     agent: Agent = Field(default_factory=Agent)
     
 
@@ -127,8 +132,14 @@ def load_config() -> Config:
     with CONFIG_FILE.open("r") as f:
         data = json.load(f)
 
+    raw_config = {}
+    raw_config["workspaces"] = {w["id"]: w for w in data["workspaces"]}
+    raw_config["providers"] = {p["name"]: p for p in data["providers"]}
+    raw_config["models"] = {m["name"]: m for m in data["models"]}
+    raw_config["agent"] = data["agent"]
+
     try:
-        return Config.model_validate(data)
+        return Config.model_validate(raw_config)
 
     except ValidationError as e:
         raise RuntimeError(format_config_error(e)) from e

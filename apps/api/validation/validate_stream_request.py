@@ -1,11 +1,13 @@
 from fastapi import HTTPException
 from bluegill_shared.models import StreamRequest
+from bluegill_shared.utils import Config
 from bluegill_agent import MIN_WINDOW, InvalidProviderError, ProviderFactory
 
 from api.service.session_manager import SessionManager
 from api.helper.try_session_manager import try_session_manager
 
-async def validate_stream_request(payload: StreamRequest, sm: SessionManager) -> None:
+
+async def validate_stream_request(payload: StreamRequest, sm: SessionManager, cfg: Config) -> None:
     """
     Validates attributes of the given StreamRequest.
     Raises an appropriate FastAPI HTTPException if any attribute is invalid.
@@ -32,7 +34,10 @@ async def validate_stream_request(payload: StreamRequest, sm: SessionManager) ->
         )
         
     try:
-        provider = ProviderFactory.get_provider(payload.provider)
+        provider = ProviderFactory.create(
+            provider_name=payload.provider,
+            base_url=cfg.providers[payload.provider].url
+        )
     except InvalidProviderError:
         raise HTTPException(
             status_code=400,

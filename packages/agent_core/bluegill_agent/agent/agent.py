@@ -1,4 +1,3 @@
-from httpx import HTTPStatusError
 import json
 import re
 from typing import Any, AsyncGenerator
@@ -61,6 +60,7 @@ def _parse_tool_call(text: str) -> AgentStreamResponse:
 
 async def run_agent(
     provider: str, 
+    base_url: str,
     model: str, 
     messages: list[Message], 
     window: int
@@ -70,12 +70,12 @@ async def run_agent(
     executions in response to the given message chain.
     """
     
-    def create_message(role: Role, content: str) -> None:
+    def create_message(role: Role, content: str | None) -> None:
         """
         Adds a message to the growing agent context.
         """
         
-        message = Message(role=role, content=content)
+        message = Message(role=role, content=content or "")
         full_context.append(message)
         new_context.append(message) 
     
@@ -89,7 +89,7 @@ async def run_agent(
             content=f"Agent context window must be >= {MIN_WINDOW}",
             total_duration=0,
             token_count=0,
-            context=([m.model_dump() for m in messages], [])
+            context=(messages, [])
         )
         return
         
@@ -100,12 +100,12 @@ async def run_agent(
             content="No messages received",
             total_duration=0,
             token_count=0,
-            context=([m.model_dump() for m in messages], [])
+            context=(messages, [])
         )
         return
     
     try:
-        llm_provider = ProviderFactory.get_provider(provider)
+        llm_provider = ProviderFactory.create(provider, base_url)
     except InvalidProviderError as e:
         yield AgentStreamResponse(
             event="error",
@@ -113,7 +113,7 @@ async def run_agent(
             content=str(e),
             total_duration=0,
             token_count=0,
-            context=([m.model_dump() for m in messages], [])
+            context=(messages, [])
         )
         return
     
@@ -125,7 +125,7 @@ async def run_agent(
                 content=f"Model '{model}' not found",
                 total_duration=0,
                 token_count=0,
-                context=([m.model_dump() for m in messages], [])
+                context=(messages, [])
             )
             return
     except ProviderError as e:
@@ -135,7 +135,7 @@ async def run_agent(
             content=str(e),
             total_duration=0,
             token_count=0,
-            context=([m.model_dump() for m in messages], [])
+            context=(messages, [])
         )
         return       
         
@@ -159,8 +159,8 @@ async def run_agent(
                 window=window
             ):
                 if chunk.done:
-                    total_duration += chunk.total_duration
-                    token_count += chunk.token_count
+                    total_duration += chunk.total_duration or 0
+                    token_count += chunk.token_count or 0
                     stream_complete = True
                     break
                 
@@ -192,11 +192,8 @@ async def run_agent(
                 done=True,
                 content=str(e),
                 total_duration=total_duration,
-                token_count=token_count,
-                context=(
-                    [m.model_dump() for m in messages],
-                    [m.model_dump() for m in new_context]
-                )
+                token_count=token_count, 
+                context=(messages, new_context)
             )
             return
         
@@ -209,10 +206,7 @@ async def run_agent(
                 content="Provider stream ended unexpectedly",
                 total_duration=total_duration,
                 token_count=token_count,
-                context=(
-                    [m.model_dump() for m in messages],
-                    [m.model_dump() for m in new_context]
-                )
+                context=(messages, new_context)
             )
             return
                 
@@ -294,10 +288,7 @@ async def run_agent(
                 done=True,
                 total_duration=total_duration,
                 token_count=token_count,
-                context=(
-                    [m.model_dump() for m in messages],
-                    [m.model_dump() for m in new_context]
-                )
+                context=(messages, new_context)
             )
             return
     
@@ -308,10 +299,7 @@ async def run_agent(
             content="Max steps reached",
             total_duration=total_duration,
             token_count=token_count,
-            context=(
-                [m.model_dump() for m in messages],
-                [m.model_dump() for m in new_context]
-            )
+            context=(messages, new_context)
         ) 
         return
            

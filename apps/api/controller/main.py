@@ -4,12 +4,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from bluegill_agent import WorkspaceProvider
 from bluegill_shared.models import Message, Session, StreamRequest, AgentStreamResponse
+from bluegill_shared.utils import load_config
 
 from api.service.session_manager import SessionManager
 from api.service.agent_service import AgentService
 from api.repository.message_repository import MessageRepository
 from api.repository.session_repository import SessionRepository
-from api.exception.session_manager_exception import SessionManagerError
 from api.exception.agent_service_exception import AgentServiceError
 from api.validation.validate_stream_request import validate_stream_request
 from api.helper.try_session_manager import try_session_manager
@@ -23,7 +23,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     
     WorkspaceProvider.initialize("~/workspaces")
     app.state.session_manager = SessionManager(SessionRepository(), MessageRepository())
-    app.state.agent_service = AgentService(app.state.session_manager)
+    app.state.config = load_config()
+    app.state.agent_service = AgentService(app.state.session_manager, app.state.config)
     
     yield
     
@@ -38,9 +39,10 @@ async def stream(payload: StreamRequest, request: Request) -> StreamingResponse:
     """
     
     sm = request.app.state.session_manager
+    cfg = request.app.state.config
     agent_service = request.app.state.agent_service
     
-    await validate_stream_request(payload, sm)
+    await validate_stream_request(payload, sm, cfg)
 
     try:
         return StreamingResponse(await agent_service.chat_stream(payload), media_type="application/x-ndjson")
@@ -56,9 +58,10 @@ async def generate(payload: StreamRequest, request: Request) -> AgentStreamRespo
     """
     
     sm = request.app.state.session_manager
+    cfg = request.app.state.config
     agent_service = request.app.state.agent_service
     
-    await validate_stream_request(payload, sm)
+    await validate_stream_request(payload, sm, cfg)
     
     try:
         response = await agent_service.generate(payload)

@@ -5,7 +5,7 @@ from api.service.session_manager import SessionManager
 from api.helper.try_session_manager import try_session_manager
 
 
-async def rename_session(provider: str, model: str, window: int, session_id: str, sm: SessionManager) -> None:
+async def rename_session(provider: str, base_url: str, model: str, window: int, session_id: str, sm: SessionManager) -> None:
     """
     Generates an AI generated title and renames the given session in the SessionManager.
     """ 
@@ -17,7 +17,7 @@ async def rename_session(provider: str, model: str, window: int, session_id: str
     messages = try_session_manager(sm.get_messages, session_id=session_id)
     messages.append(Message(role="system", content=prompt))
     
-    llm_provider = ProviderFactory.get_provider(provider)
+    llm_provider = ProviderFactory.create(provider, base_url)
     response = await llm_provider.generate(model, messages, window)
     
     if response.response:

@@ -1,7 +1,8 @@
-from typing import AsyncGenerator, AsyncIterator, Callable
+from typing import AsyncGenerator, AsyncIterator
 import asyncio
 
 from bluegill_shared.models import AgentStreamResponse, StreamRequest, Message
+from bluegill_shared.utils import Config
 from bluegill_agent import run_agent, ProviderFactory
 
 from api.exception.session_manager_exception import SessionManagerError
@@ -11,8 +12,9 @@ from api.service.session_manager import SessionManager
 from api.service.session_service import rename_session
 
 class AgentService():
-    def __init__(self, sm: SessionManager) -> None:
+    def __init__(self, sm: SessionManager, cfg: Config) -> None:
         self._sm = sm
+        self._cfg = cfg
         
     async def chat_stream(self, payload: StreamRequest) -> AsyncIterator[str]:
         logger = get_logger(payload.session_id)
@@ -42,6 +44,7 @@ class AgentService():
             asyncio.create_task(
                 rename_session(
                     payload.provider,
+                    self._cfg.providers[payload.provider].url,
                     payload.model,
                     payload.window,
                     payload.session_id,
@@ -72,7 +75,7 @@ class AgentService():
         except SessionManagerError as e:
             raise AgentServiceError(str(e)) from e
         
-        llm_provider = ProviderFactory.get_provider(payload.provider)
+        llm_provider = ProviderFactory.create(payload.provider, self._cfg.providers[payload.provider].url)
         response = await llm_provider.generate(payload.model, messages, payload.window)
         
         llm_message = Message(
@@ -116,6 +119,7 @@ class AgentService():
         logger = get_logger(payload.session_id)
         async for chunk in run_agent( # run the agent
             payload.provider, 
+            self._cfg.providers[payload.provider].url,
             payload.model,
             messages,
             payload.window
