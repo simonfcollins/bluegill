@@ -25,6 +25,6 @@ class ProviderFactory:
         
         for p in config.providers:
             if p.name == provider_name:
-                return provider(p.url)
+                return provider(base_url=p.url)
             
         return provider()

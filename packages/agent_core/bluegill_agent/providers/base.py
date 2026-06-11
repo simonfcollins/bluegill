@@ -10,9 +10,14 @@ class BaseLLMProvider(ABC):
     """
     An abstract class for a LLM provider client. Features methods to interact with the provider API.
     """
+
+    def __init__(self, base_url: str) -> None:
+        self.base_url = base_url.rstrip("/") 
+
     
     @abstractmethod
-    async def generate(self, 
+    async def generate(
+        self, 
         model: str, 
         messages: list[Message], 
         window: int = 8000
@@ -26,7 +31,8 @@ class BaseLLMProvider(ABC):
 
 
     @abstractmethod
-    async def stream(self, 
+    async def stream(
+        self, 
         model: str, 
         messages: list[Message],
         system_prompt: str, 
@@ -39,8 +45,9 @@ class BaseLLMProvider(ABC):
         behavioral system prompt.
         Chunks yielded by the provider API are normalized into LLMStreamResponse objects
         """
-        
+
         raise NotImplementedError
+        yield LLMStreamResponse()
     
     
     @abstractmethod

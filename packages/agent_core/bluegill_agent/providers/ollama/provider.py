@@ -21,7 +21,7 @@ class LocalOllamaProvider(BaseLLMProvider):
     
     
     def __init__(self, base_url: str = "http://127.0.0.1:11434") -> None:
-        self.base_url = base_url.rstrip("/")
+        super().__init__(base_url=base_url)
 
     
     async def generate(self, 
@@ -43,7 +43,7 @@ class LocalOllamaProvider(BaseLLMProvider):
                     timeout=httpx.Timeout(None, read=300)
                 )
             except httpx.ConnectError as e:
-                raise ProviderError(f"could not reach ollama at '{self.base_url}': {e}")
+                raise ProviderError(f"could not reach ollama at '{self.base_url}'") from e
                 
             response.raise_for_status()
             
@@ -96,7 +96,7 @@ class LocalOllamaProvider(BaseLLMProvider):
                             )
 
             except httpx.ConnectError as e:
-                raise ProviderError(f"could not reach ollama at '{self.base_url}': {e}")
+                raise ProviderError(f"could not reach ollama at '{self.base_url}'") from e
                         
     
     async def model_exists(self, model: str) -> bool:
@@ -104,18 +104,19 @@ class LocalOllamaProvider(BaseLLMProvider):
             try:
                 response = await client.get(f"{self.base_url}/api/tags")
             except httpx.ConnectError as e:
-                raise ProviderError(f"could not reach ollama at '{self.base_url}': {e}")
+                raise ProviderError(f"could not reach ollama at '{self.base_url}'") from e
             
             try:
                 response.raise_for_status()
-            except httpx.HTTPStatusError:
-                raise ProviderError(f"ollama responded with status code {e.status_code}: '{e.detail}'")
+            except httpx.HTTPStatusError as e:
+                raise ProviderError(f"ollama responded with status code {e.response.status_code}: '{e.response.text}'") from e
             
             try:
                 data = response.json()
-            except ValueError:
-                raise ProviderError("invalid JSON response from provider")
+            except ValueError as e:
+                raise ProviderError("invalid JSON response from provider") from e
             
             models = data.get("models", [])
             
             return any(m.get("name") == model for m in models)
+        
