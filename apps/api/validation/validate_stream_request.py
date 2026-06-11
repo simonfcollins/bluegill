@@ -20,12 +20,6 @@ async def validate_stream_request(payload: StreamRequest, sm: SessionManager, cf
             status_code=404, 
             detail=f"session does not exist with id '{payload.session_id}'"
         )
-
-    if payload.window < MIN_WINDOW:
-        raise HTTPException(
-            status_code=400,
-            detail=f"context window must be >= {MIN_WINDOW}"
-        )
         
     if not payload.prompt or not payload.prompt.strip():
         raise HTTPException(

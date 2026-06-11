@@ -101,7 +101,7 @@ class Config(BaseModel):
     
     workspaces: dict[str, Workspace] = {}
     providers: dict[str, Provider] = {}
-    models: dict[str, Model] = {}
+    models: list[Model] = []
     agent: Agent = Field(default_factory=Agent)
     
 
@@ -123,24 +123,25 @@ def format_config_error(e: ValidationError) -> str:
 
 
 def load_config() -> Config:
-    """
-    Loads the global config.json file located in $HOME/.bluegill.
-    """
     if not CONFIG_FILE.exists():
         return Config()
 
     with CONFIG_FILE.open("r") as f:
         data = json.load(f)
 
-    raw_config = {}
-    raw_config["workspaces"] = {w["id"]: w for w in data["workspaces"]}
-    raw_config["providers"] = {p["name"]: p for p in data["providers"]}
-    raw_config["models"] = {m["name"]: m for m in data["models"]}
-    raw_config["agent"] = data["agent"]
-
     try:
-        return Config.model_validate(raw_config)
+        return Config.model_validate({
+            "workspaces": {
+                w["id"]: w
+                for w in data.get("workspaces", [])
+            },
+            "providers": {
+                p["name"]: p
+                for p in data.get("providers", [])
+            },
+            "models": data.get("models", []),
+            "agent": data.get("agent", {}),
+        })
 
     except ValidationError as e:
         raise RuntimeError(format_config_error(e)) from e
-        

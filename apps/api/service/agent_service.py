@@ -16,6 +16,7 @@ class AgentService():
         self._sm = sm
         self._cfg = cfg
         
+
     async def chat_stream(self, payload: StreamRequest) -> AsyncIterator[str]:
         logger = get_logger(payload.session_id)
         
@@ -39,6 +40,16 @@ class AgentService():
             messages = self._sm.get_messages(payload.session_id)
         except SessionManagerError as e:
             raise AgentServiceError(str(e)) from e
+        
+        model_cfg = next(
+            (
+                m
+                for m in self._cfg.models
+                if m.name == payload.model and m.provider == payload.provider
+            ), None
+        )
+        window = model_cfg.window if model_cfg else 8000
+
 
         if len(messages) > 1 and session.name == "New Session":
             asyncio.create_task(
@@ -46,7 +57,7 @@ class AgentService():
                     payload.provider,
                     self._cfg.providers[payload.provider].url,
                     payload.model,
-                    payload.window,
+                    window,
                     payload.session_id,
                     sm=self._sm
                 )
@@ -54,6 +65,7 @@ class AgentService():
             
         return self._stream_generator(
             payload=payload,
+            window=window,
             messages=messages
         )
     
@@ -75,8 +87,17 @@ class AgentService():
         except SessionManagerError as e:
             raise AgentServiceError(str(e)) from e
         
+        model_cfg = next(
+            (
+                m
+                for m in self._cfg.models
+                if m.name == payload.model and m.provider == payload.provider
+            ), None
+        )
+        window = model_cfg.window if model_cfg else 8000
+        
         llm_provider = ProviderFactory.create(payload.provider, self._cfg.providers[payload.provider].url)
-        response = await llm_provider.generate(payload.model, messages, payload.window)
+        response = await llm_provider.generate(payload.model, messages, window)
         
         llm_message = Message(
             role="assistant", 
@@ -95,7 +116,7 @@ class AgentService():
                 content=str(e),
                 total_duration=response.total_duration,
                 token_count=response.token_count,
-                context=([m.model_dump() for m in messages],  [])
+                context=(messages,  [])
             )
         
         if response.token_count:
@@ -110,19 +131,21 @@ class AgentService():
             content=response.response,
             total_duration=response.total_duration,
             token_count=response.token_count,
-            context=([m.model_dump() for m in messages], [llm_message.model_dump()])
+            context=(messages, [llm_message])
         )
     
 
-    async def _stream_generator(self, payload: StreamRequest, messages: list[Message]) -> AsyncGenerator[str, None]:
+    async def _stream_generator(self, payload: StreamRequest, window: int,  messages: list[Message]) -> AsyncGenerator[str, None]:
         
         logger = get_logger(payload.session_id)
+
+
         async for chunk in run_agent( # run the agent
-            payload.provider, 
-            self._cfg.providers[payload.provider].url,
-            payload.model,
-            messages,
-            payload.window
+            provider=payload.provider, 
+            base_url=self._cfg.providers[payload.provider].url,
+            model=payload.model,
+            messages=messages,
+            window=window
         ):
             if chunk.event == "error":
                 logger.error(f"[ERROR] {chunk.content}")
