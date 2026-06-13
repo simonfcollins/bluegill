@@ -103,6 +103,21 @@ class Config(BaseModel):
     providers: dict[str, Provider] = {}
     models: list[Model] = []
     agent: Agent = Field(default_factory=Agent)
+
+
+    def get_model(self, model: str, provider: str) -> Model | None:
+        """
+        Retrieves the model as described by the given model and provider names.
+        """
+
+        if not self.providers or not self.models:
+            return None
+        
+        return next(
+            m 
+            for m in self.models 
+            if m.name == model and m.provider == provider
+        )
     
 
 def format_config_error(e: ValidationError) -> str:
