@@ -3,8 +3,10 @@ import re
 from typing import Any, AsyncGenerator
 
 from bluegill_shared.models import Message, AgentStreamResponse, Role
+from bluegill_shared.utils import Model
 
 from bluegill_agent.providers.factory import ProviderFactory
+from bluegill_agent.providers.base import BaseLLMProvider
 from bluegill_agent.agent.tool_registry import TOOLS
 from bluegill_agent.agent.system_prompt import SYSTEM_PROMPT
 from bluegill_agent.agent.constants import MIN_WINDOW
@@ -59,12 +61,13 @@ def _parse_tool_call(text: str) -> AgentStreamResponse:
 
 
 async def run_agent(
-    provider: str, 
-    base_url: str,
-    model: str, 
-    messages: list[Message], 
-    window: int
+    provider: BaseLLMProvider, 
+    model: str,
+    window: int,  
+    messages: list[Message]
 ) -> AsyncGenerator[AgentStreamResponse, None]:
+    
+    # Need: model name, provider name, provider url, window, and messages
     """
     The entrypoint for the Bluegill agent. Streams the agent's response and tool 
     executions in response to the given message chain.
@@ -102,42 +105,7 @@ async def run_agent(
             token_count=0,
             context=(messages, [])
         )
-        return
-    
-    try:
-        llm_provider = ProviderFactory.create(provider, base_url)
-    except InvalidProviderError as e:
-        yield AgentStreamResponse(
-            event="error",
-            done=True,
-            content=str(e),
-            total_duration=0,
-            token_count=0,
-            context=(messages, [])
-        )
-        return
-    
-    try:
-        if not await llm_provider.model_exists(model):
-            yield AgentStreamResponse(
-                event="error",
-                done=True,
-                content=f"Model '{model}' not found",
-                total_duration=0,
-                token_count=0,
-                context=(messages, [])
-            )
-            return
-    except ProviderError as e:
-        yield AgentStreamResponse(
-            event="error",
-            done=True,
-            content=str(e),
-            total_duration=0,
-            token_count=0,
-            context=(messages, [])
-        )
-        return       
+        return    
         
     full_context = messages.copy()
     new_context: list[Message] = []
@@ -152,7 +120,7 @@ async def run_agent(
         stream_complete = False
         
         try:
-            async for chunk in llm_provider.stream(
+            async for chunk in provider.stream(
                 model=model,
                 messages=full_context,
                 system_prompt=SYSTEM_PROMPT, 

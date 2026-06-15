@@ -9,14 +9,17 @@ class ProviderFactory:
     }
 
     @classmethod
-    def create(cls, provider_name: str, base_url: str) -> BaseLLMProvider:
-        """
-        A factory method to retrieve a provider object by common provider name.
-        """
-        
+    def create(
+        cls,
+        provider_name: str,
+        base_url: str | None = None,
+    ) -> BaseLLMProvider:
+    
         provider = cls._providers.get(provider_name.lower())
-        
-        if not provider:
-            raise InvalidProviderError(f"Unsupported provider: {provider_name}")
-        
+    
+        if provider is None:
+            raise InvalidProviderError(
+                f"Unsupported provider: {provider_name}"
+            )
+    
         return provider(base_url=base_url)

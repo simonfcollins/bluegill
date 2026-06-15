@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from bluegill_shared.models import StreamRequest
 from bluegill_shared.utils import Config
-from bluegill_agent import MIN_WINDOW, InvalidProviderError, ProviderFactory
+from bluegill_agent import MIN_WINDOW, InvalidProviderError, ProviderFactory, ProviderError
 
 from api.service.session_manager import SessionManager
 from api.helper.try_session_manager import try_session_manager
@@ -38,8 +38,15 @@ async def validate_stream_request(payload: StreamRequest, sm: SessionManager, cf
             detail=f"'{payload.provider}' is not a valid provider"
         )
         
-    if not await provider.model_exists(payload.model):
+    try:
+        if not await provider.model_exists(payload.model):
+            raise HTTPException(
+                status_code=404,
+                detail=f"model '{payload.model}' not found"
+            )
+
+    except ProviderError as e:
         raise HTTPException(
-            status_code=404,
-            detail=f"model '{payload.model}' not found"
-        )
+            status_code=500,
+            detail=f"error connecting to provider '{payload.provider}'"
+        ) from e

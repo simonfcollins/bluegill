@@ -3,7 +3,7 @@ import asyncio
 
 from bluegill_shared.models import AgentStreamResponse, StreamRequest, Message
 from bluegill_shared.utils import Config
-from bluegill_agent import run_agent, ProviderFactory
+from bluegill_agent import run_agent, ProviderFactory, BaseLLMProvider, ProviderError
 
 from api.exception.session_manager_exception import SessionManagerError
 from api.exception.agent_service_exception import AgentServiceError
@@ -20,14 +20,27 @@ class AgentService():
     async def chat_stream(self, payload: StreamRequest) -> AsyncIterator[str]:
         logger = get_logger(payload.session_id)
         
-        try:
+        try: # retrieve session for future renaming
             session = self._sm.get_session(payload.session_id)
+
+            if not session:
+                raise AgentServiceError(f"Session not found with id '{payload.session_id}'")
             
         except SessionManagerError as e:
             raise AgentServiceError(str(e)) from e
         
-        if not session:
-            raise AgentServiceError(f"Session not found with id '{payload.session_id}'")
+        try: # instantiate provider
+            provider = self._cfg.providers.get(payload.provider)
+            provider_url = provider.url if provider is not None else None
+            llm_provider = ProviderFactory.create(payload.provider, provider_url)
+
+        except ProviderError as e:
+            raise AgentServiceError(f"'{payload.provider}' is not a valid provider") from e
+        
+        # retrieve model from config
+        model = self._cfg.get_model(payload.model, payload.provider)
+        if not model:
+            raise AgentServiceError(f"Unable to locate model '{payload.model}'")
     
         try:
             # add user prompt to the session
@@ -40,32 +53,24 @@ class AgentService():
             messages = self._sm.get_messages(payload.session_id)
         except SessionManagerError as e:
             raise AgentServiceError(str(e)) from e
-        
-        model_cfg = next(
-            (
-                m
-                for m in self._cfg.models
-                if m.name == payload.model and m.provider == payload.provider
-            ), None
-        )
-        window = model_cfg.window if model_cfg else 8000
-
-
+    
         if len(messages) > 1 and session.name == "New Session":
             asyncio.create_task(
                 rename_session(
                     payload.provider,
                     self._cfg.providers[payload.provider].url,
                     payload.model,
-                    window,
+                    model.window,
                     payload.session_id,
                     sm=self._sm
                 )
             )
             
         return self._stream_generator(
-            payload=payload,
-            window=window,
+            session_id=payload.session_id,
+            provider=llm_provider,
+            model=payload.model,
+            window=model.window,
             messages=messages
         )
     
@@ -135,17 +140,23 @@ class AgentService():
         )
     
 
-    async def _stream_generator(self, payload: StreamRequest, window: int,  messages: list[Message]) -> AsyncGenerator[str, None]:
+    async def _stream_generator(
+        self, 
+        session_id: str, 
+        provider: BaseLLMProvider, 
+        model: str,
+        window: int, 
+        messages: list[Message]
+    ) -> AsyncGenerator[str, None]:
         
-        logger = get_logger(payload.session_id)
+        logger = get_logger(session_id)
 
 
         async for chunk in run_agent( # run the agent
-            provider=payload.provider, 
-            base_url=self._cfg.providers[payload.provider].url,
-            model=payload.model,
-            messages=messages,
-            window=window
+            provider=provider, 
+            model=model,
+            window=window,
+            messages=messages
         ):
             if chunk.event == "error":
                 logger.error(f"[ERROR] {chunk.content}")
@@ -157,7 +168,7 @@ class AgentService():
                         new_messages.append(Message(
                             role=m.role, 
                             content=m.content, 
-                            session_id=payload.session_id
+                            session_id=session_id
                         ))
                         # log conversation
                         log = logger.warning if m.role == "system" else logger.info
@@ -176,7 +187,7 @@ class AgentService():
                             ).model_dump_json(exclude_none=True) + "\n"
                 if chunk.token_count is not None:
                     self._sm.update_session(
-                        session_id=payload.session_id, 
+                        session_id=session_id, 
                         tokens_used=chunk.token_count
                     )
             

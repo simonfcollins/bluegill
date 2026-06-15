@@ -110,13 +110,12 @@ class Config(BaseModel):
         Retrieves the model as described by the given model and provider names.
         """
 
-        if not self.providers or not self.models:
-            return None
-        
         return next(
+            (
             m 
             for m in self.models 
-            if m.name == model and m.provider == provider
+            if m.name == model and m.provider == provider    
+            ), None
         )
     
 
