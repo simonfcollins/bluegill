@@ -186,7 +186,7 @@ async def run_agent(
                 
                 yield response # yield the assistant's tool call
                 
-                tool = TOOLS.get(response.tool)
+                tool = TOOLS.get(response.tool) if response.tool else None
     
                 if not tool:
                     raise ToolNotFoundError(f"'{response.tool}' tool does not exist")
@@ -203,50 +203,50 @@ async def run_agent(
                 continue
             
             except ToolNotFoundError:
-                create_message("system", f"{response.tool} does not exist")
+                create_message("system", f"{response.tool} does not exist\nAgent response: {buffer_str}")
                 
                 yield AgentStreamResponse(
                     event="error",
-                    content=f"'{response.tool}' tool does not exist"
+                    content=f"'{response.tool}' tool does not exist\nAgent response: {buffer_str}"
                 )
                 continue
             
             except ToolExecutionError as e:
-                create_message("system", f"An error was encountered when trying to run tool '{response.tool}': {e}")
+                create_message("system", f"An error was encountered when trying to run tool '{response.tool}': {e}\nAgent response: {buffer_str}")
            
                 yield AgentStreamResponse(
                     event="error",
-                    content=f"An error was encountered when trying to run tool '{response.tool}': {e}"
+                    content=f"An error was encountered when trying to run tool '{response.tool}': {e}\nAgent response: {buffer_str}"
                 )
                 continue
             
             except SafePathError as e:
-                create_message("system", f"Error running tool '{response.tool}': {e}")
+                create_message("system", f"Error running tool '{response.tool}': {e}\nAgent response: {buffer_str}")
                 
                 yield AgentStreamResponse(
                     event="error",
-                    content=f"Error running tool '{response.tool}': {e}"
+                    content=f"Error running tool '{response.tool}': {e}\nAgent response: {buffer_str}"
                 )
                 continue
             
             except JSONParseError:
                 create_message(
                     "system", 
-                    "Error parsing JSON. Your previous response was malformed and could not be parsed. Please try again"
+                    f"Error parsing JSON. Your previous response was malformed and could not be parsed. Please try again\nAgent response: {buffer_str}"
                 )
                 
                 yield AgentStreamResponse(
                     event="error",
-                    content="Error parsing JSON. Your previous response was malformed and could not be parsed. Please try again"
+                    content=f"Error parsing JSON. Your previous response was malformed and could not be parsed. Please try again\nAgent response: {buffer_str}"
                 )
                 continue
 
             except Exception:
-                create_message("system", "An unexpected error occurred")
+                create_message("system", f"An unexpected error occurred\nAgent response: {buffer_str}")
                 
                 yield AgentStreamResponse(
                     event="error",
-                    content="An unexpected error occurred"
+                    content=f"An unexpected error occurred\nAgent response: {buffer_str}"
                 )
                 continue
             
