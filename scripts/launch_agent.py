@@ -17,16 +17,6 @@ DOCKER_BASE_DIR = Path(f"/home/{DOCKER_USER}/workspaces/")
 DOCKER_IMAGE = "bluegill_agent:latest"
 
 
-def load_workspace_dirs() -> list[Path]:
-    """
-    Reads the config.json file and returns the list of workspace paths.
-    """
-
-    cfg: Config = load_config()
-        
-    return [Path(ws.path).expanduser().resolve() for ws in cfg.workspaces]
-
-
 def verify_docker() -> bool:
     """
     Returns True if Docker is installed on the host. False otherwise.
@@ -127,15 +117,13 @@ def launch_agent() -> None:
         
     # prepare the workspaces for bind mounting
     mounts = []
-    workspace_dirs = load_workspace_dirs()
-    
-    # default workspace
-    DEFAULT_WORKSPACE.mkdir(exist_ok=True)
-    mounts.extend(["-v", f"{DEFAULT_WORKSPACE}:{DOCKER_BASE_DIR / 'default-workspace'}"])
+    cfg = load_config()
 
-    # user-defined workspaces
-    for d in workspace_dirs:
-        mounts.extend(["-v", f"{Path(d).expanduser().resolve()}:{DOCKER_BASE_DIR / Path(d).name}"])
+    # DEFAULT_WORKSPACE.mkdir(exist_ok=True)
+    # mounts.extend(["-v", f"{DEFAULT_WORKSPACE}:{DOCKER_BASE_DIR / 'default'}"])
+    
+    for w in list(cfg.workspaces.values()):
+        mounts.extend(["-v", f"{Path(w.path).expanduser().resolve()}:{DOCKER_BASE_DIR / w.id}"])
         
     # docker launch command
     cmd = [

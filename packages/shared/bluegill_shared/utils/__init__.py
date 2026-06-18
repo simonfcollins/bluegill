@@ -5,5 +5,7 @@ __all__ = [
     "Model",
     "Provider",
     "Workspace",
+    "Compact",
+    "Agent",
     "load_config"
 ]

@@ -1,10 +1,10 @@
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from bluegill_agent import WorkspaceProvider
-from bluegill_shared.models import Message, Session, StreamRequest, AgentStreamResponse
-from bluegill_shared.utils import load_config
+from bluegill_shared.models import Message, Session, StreamRequest, AgentStreamResponse, NewSessionRequest
+from bluegill_shared.utils import load_config, Workspace
 
 from api.service.session_manager import SessionManager
 from api.service.agent_service import AgentService
@@ -13,6 +13,7 @@ from api.repository.session_repository import SessionRepository
 from api.exception.agent_service_exception import AgentServiceError
 from api.validation.validate_stream_request import validate_stream_request
 from api.helper.try_session_manager import try_session_manager
+from api.service.workspace_registry import WorkspaceRegistry
 
 
 @asynccontextmanager
@@ -21,10 +22,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     FastAPI context manager. Initializes workspaces and session manager.
     """
     
-    WorkspaceProvider.initialize("~/workspaces")
-    app.state.session_manager = SessionManager(SessionRepository(), MessageRepository())
-    app.state.config = load_config()
-    app.state.agent_service = AgentService(app.state.session_manager, app.state.config)
+    sm = SessionManager(SessionRepository(), MessageRepository())
+    cfg = load_config()
+    wr = WorkspaceRegistry(list(cfg.workspaces.values()), Path("/home/assistant/workspaces"))
+    
+    app.state.session_manager = sm
+    app.state.config = cfg
+    app.state.workspace_registry = wr
+    app.state.agent_service = AgentService(sm, cfg, wr)
     
     yield
     
@@ -90,7 +95,15 @@ async def get_last_session(request: Request) -> Session:
     
     sm = request.app.state.session_manager
     
-    return try_session_manager(sm.load_last_session)
+    session = try_session_manager(sm.load_last_session)
+    
+    if session == None:
+        raise HTTPException(
+            status_code=404, 
+            detail="No sessions found. Create a new session using the '/sessions' POST endpoint"
+        )
+    
+    return session
 
 
 @app.get("/sessions/{session_id}")
@@ -110,14 +123,14 @@ async def get_session(session_id: str, request: Request) -> Session:
     
 
 @app.post("/sessions")
-async def create_session(request: Request) -> Session:
+async def create_session(payload: NewSessionRequest, request: Request) -> Session:
     """
     Create a new session and return the session_id.
     """
     
     sm = request.app.state.session_manager
-    
-    return try_session_manager(sm.new_session)
+
+    return try_session_manager(sm.new_session, workspace_id=payload.workspace_id)
 
 
 @app.post("/sessions/{session_id}/clear")
@@ -154,4 +167,15 @@ async def compact(session_id: str, request: Request) -> dict[str, str]:
     sm = request.app.state.session_manager
     
     raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@app.get("/workspaces")
+async def get_workspaces(request: Request) -> list[Workspace]:
+    """
+    Returns a list of all available agent workspaces.
+    """
+    
+    wr = request.app.state.workspace_registry
+    
+    return wr.workspaces
         

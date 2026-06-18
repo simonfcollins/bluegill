@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from bluegill_shared.models import StreamRequest
 from bluegill_shared.utils import Config
-from bluegill_agent import MIN_WINDOW, InvalidProviderError, ProviderFactory, ProviderError
+from bluegill_agent import InvalidProviderError, ProviderFactory, ProviderError
 
 from api.service.session_manager import SessionManager
 from api.helper.try_session_manager import try_session_manager

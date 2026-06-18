@@ -1,7 +1,10 @@
 import asyncio
 import shlex
 import re
+from pathlib import Path
+
 from bluegill_agent.agent.tools.base import Tool
+from bluegill_agent.agent.tools.utils import safe_path
 
 
 # Matches patterns at the beginning of a command segment.
@@ -42,7 +45,7 @@ class BashTool(Tool):
     args = "'command': The command to execute."
     description = "Run shell commands (supports pipes, &&, ;) within a restricted safe subset"
 
-    async def run(self, input: dict) -> str:
+    async def run(self, input: dict, working_dir: Path) -> str:
         """
         Executes the given bash command in an asyncio subprocess.
         
@@ -53,6 +56,8 @@ class BashTool(Tool):
         Returns:
             The result of running the bash command.
         """
+        
+        
         cmd = input.get("command")
         if not cmd:
             return "No command provided"
@@ -68,6 +73,7 @@ class BashTool(Tool):
             try:
                 proc = await asyncio.create_subprocess_shell(
                     single_cmd,
+                    cwd=str(working_dir.resolve()),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )

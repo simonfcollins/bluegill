@@ -1,4 +1,5 @@
 import difflib
+from pathlib import Path
 
 from bluegill_agent.agent.tools.base import Tool
 from bluegill_agent.agent.tools.utils import safe_path
@@ -17,9 +18,9 @@ class EditFileTool(Tool):
         "A unified diff will be generated automatically."
     )
 
-    async def run(self, input: dict) -> str:
+    async def run(self, input: dict, working_dir: Path) -> str:
         try:
-            path = safe_path(input["path"])
+            path = safe_path(working_dir, input["path"])
 
             if path.exists() and not path.is_file():
                 raise spe.IsADirectoryError(f"{path} is not a file")

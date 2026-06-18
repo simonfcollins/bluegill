@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any
+from pathlib import Path
 
 class Tool(ABC):
     """
@@ -12,7 +13,7 @@ class Tool(ABC):
     description: str
 
     @abstractmethod
-    async def run(self, input: dict[str, Any]) -> str:
+    async def run(self, input: dict[str, Any], working_dir: Path) -> str:
         """
         Executes the tool.
         

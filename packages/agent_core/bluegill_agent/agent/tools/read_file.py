@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from bluegill_agent.agent.tools.base import Tool
 import bluegill_agent.exceptions.safe_path_exception as spe
 from bluegill_agent.exceptions.tool_exception import ReadFileError
@@ -9,9 +11,9 @@ class ReadFileTool(Tool):
     args = "'path': The absolute or relative path to the file to be read"
     description = "Read a file from workspace"
 
-    async def run(self, input: dict) -> str:
+    async def run(self, input: dict, working_dir: Path) -> str:
         try:
-            path = safe_path(input["path"])
+            path = safe_path(working_dir, input["path"])
 
             if not path.exists():
                 raise spe.PathNotFoundError(f"{path} does not exist")

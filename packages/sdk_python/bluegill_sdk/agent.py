@@ -2,7 +2,8 @@ import httpx
 import json
 from typing import AsyncGenerator
 from pydantic import ValidationError
-from bluegill_shared.models import *
+from bluegill_shared.models import Message, Session, AgentStreamResponse, StreamRequest, NewSessionRequest
+from bluegill_shared.utils import Workspace
 
 from bluegill_sdk.exception import AgentError
 
@@ -13,32 +14,36 @@ class Agent:
         api_url: str = "http://localhost:54345", # URL where the Bluegill API is running.
         provider: str | None = None,             # The model provider (e.g. "ollama")
         model: str | None = None,                # The model to use for queries (e.g. "qwen3-coder:latest")
-        window: int = 8000,                      # The maximum input context window size.
         session_id: str | None = None,           # The ID of the active session.
         timeout: int = 20,                       # The timeout value injected into the header of all API calls.
     ) -> None:
         self.api_url = api_url.rstrip("/")
         self.provider = provider
         self.model = model
-        self.window = window
         self._session_id = session_id
         self.tokens_used = 0
         self._messages: list[Message] = []
+        self._workspaces: list[Workspace] = []
         self.timeout = timeout
         self._client = httpx.Client(timeout=self.timeout)
         
         if session_id:
             self.load_session(session_id)
+            
+        self.load_workspaces()
 
 
-    def new_session(self) -> str:
+    def new_session(self, workspace_id: str) -> str:
         """
         Create a new session and set it as the current session.
         Returns the ID of the new session.
         """
         
         try:
-            response = self._client.post(f"{self.api_url}/sessions")
+            response = self._client.post(
+                f"{self.api_url}/sessions",
+                json=NewSessionRequest(workspace_id=workspace_id).model_dump()
+            )
             response.raise_for_status()
             
             session = Session.model_validate(response.json())
@@ -110,9 +115,23 @@ class Agent:
             self._session_id = session.id
             self.tokens_used = session.tokens_used
             self._load_messages()
+            
+        except httpx.HTTPStatusError as e:
+            raise AgentError("No sessions available") from e
 
         except (httpx.HTTPError, ValidationError) as e:
-            raise AgentError("error loading last session", e)
+            raise AgentError("error loading last session")
+        
+        
+    def load_workspaces(self) -> None:
+        try:
+            response = self._client.get(f"{self.api_url}/workspaces")
+            response.raise_for_status()
+            
+            self._workspaces = [Workspace.model_validate(w) for w in response.json()]
+        
+        except (httpx.HTTPError, ValidationError) as e:
+            raise AgentError("Error loading workspaces") from e
             
         
     def get_sessions(self) -> list[Session]:
@@ -149,16 +168,6 @@ class Agent:
 
         except (httpx.HTTPError, ValidationError) as e:
             raise AgentError("error retrieving session message dump", e)
-
-
-    def is_ready(self) -> bool:
-        """
-        Determines whether or not the Agent is ready to receive queries.
-        True if the Agent has been initialized with a provider, model, and active session.
-        False otherwise.
-        """
-        
-        return all([self.provider, self.model, self._session_id])
     
     
     async def chat_stream(self, prompt: str) -> AsyncGenerator[AgentStreamResponse, None]:
@@ -166,13 +175,17 @@ class Agent:
         Query the Agent. Response is streamed. 
         """
         
-        if not self.is_ready() or not prompt:
-            return 
+        if (
+            self.provider is None 
+            or self.model is None 
+            or self._session_id is None 
+            or prompt is None
+        ):
+            return
         
         payload = StreamRequest(
             provider=self.provider,
             model=self.model,
-            window=self.window,
             session_id=self._session_id,
             prompt=prompt
         )
@@ -209,7 +222,7 @@ class Agent:
                             content=line
                         )
         
-        self.load_session(self.session_id)
+        self.load_session(self._session_id)
     
 
     def close(self) -> None:
@@ -250,6 +263,11 @@ class Agent:
     @property
     def messages(self) -> list[Message]:       
         return self._messages
+    
+    
+    @property
+    def workspaces(self) -> list[Workspace]:       
+        return self._workspaces
     
     
     # ------------------------

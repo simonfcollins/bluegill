@@ -18,4 +18,5 @@ class Session(BaseModel):
     name: str
     tokens_used: int
     created_at: str | None= None
+    workspace_id: str
     

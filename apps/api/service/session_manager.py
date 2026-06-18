@@ -14,14 +14,14 @@ class SessionManager:
         self.message_repository = message_repository
 
         
-    def new_session(self) -> Session:
+    def new_session(self, workspace_id: str) -> Session:
         """
         Generate a new session ID and initialize it with the system prompt.
         """
         
         try:
             session_id = str(uuid.uuid4())
-            self._add_session(session_id)
+            self._add_session(session_id, workspace_id=workspace_id)
             session = self.session_repository.get(session_id)
 
             if not session:
@@ -59,7 +59,7 @@ class SessionManager:
     
 
     
-    def load_last_session(self) -> Session:
+    def load_last_session(self) -> Session | None:
         """
         Retrieve the last used session. 
         Determined by the most recent message in the SessionManager.
@@ -78,9 +78,9 @@ class SessionManager:
                 raise SessionManagerError(
                     f"Session '{last_message.session_id}' not found for last message"
                 )
-
-            # no messages exist → create fresh session
-            return self.new_session()
+                
+            # otherwise, since no messages exist, return most recently created session
+            return self.session_repository.get_last()
 
         except RepositoryError as e:
             raise SessionManagerError("Failed to load last session") from e
@@ -144,7 +144,8 @@ class SessionManager:
         updated_session = Session(
             id=session_id,
             name=name if name is not None else session.name,
-            tokens_used=tokens_used if tokens_used is not None else session.tokens_used
+            tokens_used=tokens_used if tokens_used is not None else session.tokens_used,
+            workspace_id=session.workspace_id
         )
         
         try:
@@ -247,7 +248,7 @@ class SessionManager:
                 f"Unexpected error getting messages for session '{session_id}'") from e
         
         
-    def _add_session(self, session_id: str, name: str = "New Session", tokens_used: int = 0) -> None:
+    def _add_session(self, session_id: str, workspace_id: str, name: str = "New Session", tokens_used: int = 0) -> None:
         """
         Persists a new session entity to the database.
         """
@@ -257,7 +258,8 @@ class SessionManager:
                 Session(
                     id=session_id,
                     name=name,
-                    tokens_used=tokens_used
+                    tokens_used=tokens_used,
+                    workspace_id=workspace_id
                 )
             )
 

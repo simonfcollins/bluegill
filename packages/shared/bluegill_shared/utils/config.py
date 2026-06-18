@@ -23,7 +23,7 @@ class Workspace(BaseModel):
     
     id: str
     name: str
-    path: str
+    path: Path
 
 
 class Provider(BaseModel):

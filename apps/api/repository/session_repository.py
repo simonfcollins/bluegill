@@ -24,7 +24,8 @@ class SessionRepository(Repository[Session, str]):
                             id TEXT PRIMARY KEY,
                             name TEXT,
                             tokens_used INTEGER,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            workspace_id TEXT
                         )
                     """)
                     conn.commit()
@@ -43,7 +44,7 @@ class SessionRepository(Repository[Session, str]):
         try:
             with self._conn() as conn:
                 cursor = conn.execute(
-                    "SELECT id, name, tokens_used, created_at FROM sessions WHERE id = ?",
+                    "SELECT id, name, tokens_used, created_at, workspace_id FROM sessions WHERE id = ?",
                     (id,)
                 )
                 row = cursor.fetchone()
@@ -54,7 +55,45 @@ class SessionRepository(Repository[Session, str]):
         if row is None:
             return None
 
-        return Session(id=row[0], name=row[1], tokens_used=row[2], created_at=row[3])
+        return Session(
+            id=row[0], 
+            name=row[1], 
+            tokens_used=row[2], 
+            created_at=row[3], 
+            workspace_id=row[4]
+        )
+    
+    
+    def get_last(self) -> Session | None:
+        """
+        Retrieve the most recently inserted session.
+        """
+        
+        try:
+            with self._conn() as conn:
+                cursor = conn.execute(
+                    """
+                    SELECT id, name, tokens_used, created_at, workspace_id 
+                    FROM sessions
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    """
+                )
+                row = cursor.fetchone()
+
+        except sqlite3.Error as e:
+            raise RepositoryError("Failed to fetch most recent session") from e
+
+        if row is None:
+            return None
+        
+        return Session(
+            id=row[0], 
+            name=row[1], 
+            tokens_used=row[2], 
+            created_at=row[3], 
+            workspace_id=row[4]
+        )
         
         
     def get_all(self) -> list[Session]:
@@ -65,7 +104,7 @@ class SessionRepository(Repository[Session, str]):
         try:
             with self._conn() as conn:
                 cursor = conn.execute(
-                    "SELECT id, name, tokens_used, created_at FROM sessions"
+                    "SELECT id, name, tokens_used, created_at, workspace_id FROM sessions"
                 )
                 rows = cursor.fetchall()
 
@@ -73,7 +112,7 @@ class SessionRepository(Repository[Session, str]):
             raise RepositoryError("Failed to fetch all sessions") from e
 
         return [
-            Session(id=row[0], name=row[1], tokens_used=row[2], created_at=row[3])
+            Session(id=row[0], name=row[1], tokens_used=row[2], created_at=row[3], workspace_id=row[4])
             for row in rows
         ]
         
@@ -87,8 +126,8 @@ class SessionRepository(Repository[Session, str]):
             def op() -> None:
                 with self._conn() as conn:
                     conn.execute(
-                        "INSERT INTO sessions (id, name, tokens_used) VALUES (?, ?, ?)",
-                        (entity.id, entity.name, entity.tokens_used)
+                        "INSERT INTO sessions (id, name, tokens_used, workspace_id) VALUES (?, ?, ?, ?)",
+                        (entity.id, entity.name, entity.tokens_used, entity.workspace_id)
                     )
                     conn.commit()
 

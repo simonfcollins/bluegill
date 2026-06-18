@@ -1,11 +1,10 @@
 import json
 import re
 from typing import Any, AsyncGenerator
+from pathlib import Path
 
 from bluegill_shared.models import Message, AgentStreamResponse, Role
-from bluegill_shared.utils import Model
 
-from bluegill_agent.providers.factory import ProviderFactory
 from bluegill_agent.providers.base import BaseLLMProvider
 from bluegill_agent.agent.tool_registry import TOOLS
 from bluegill_agent.agent.system_prompt import SYSTEM_PROMPT
@@ -14,7 +13,7 @@ from bluegill_agent.exceptions.tool_exception import ToolExecutionError
 from bluegill_agent.exceptions.agent_exception import JSONParseError
 from bluegill_agent.exceptions.safe_path_exception import SafePathError
 from bluegill_agent.exceptions.tool_exception import ToolNotFoundError
-from bluegill_agent.exceptions.provider_exception import InvalidProviderError, ProviderError
+from bluegill_agent.exceptions.provider_exception import ProviderError
 
 
 MAX_ITERATIONS = 20
@@ -62,9 +61,10 @@ def _parse_tool_call(text: str) -> AgentStreamResponse:
 
 async def run_agent(
     provider: BaseLLMProvider, 
-    model: str,
-    window: int,  
-    messages: list[Message]
+    model: str, 
+    messages: list[Message], 
+    window: int,
+    working_dir: Path
 ) -> AsyncGenerator[AgentStreamResponse, None]:
     
     # Need: model name, provider name, provider url, window, and messages
@@ -191,7 +191,7 @@ async def run_agent(
                 if not tool:
                     raise ToolNotFoundError(f"'{response.tool}' tool does not exist")
             
-                tool_result = await tool.run(response.input) # run the tool
+                tool_result = await tool.run(response.input, working_dir) # run the tool
                 create_message("tool", tool_result)
 
                 yield AgentStreamResponse( # yield the result of the tool call
