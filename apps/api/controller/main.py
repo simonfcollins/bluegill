@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from bluegill_shared.models import Message, Session, StreamRequest, AgentStreamResponse, NewSessionRequest
-from bluegill_shared.utils import load_config, Workspace
+from bluegill_shared.utils import load_config, Workspace, Model
 
 from api.service.session_manager import SessionManager
 from api.service.agent_service import AgentService
@@ -167,6 +167,15 @@ async def compact(session_id: str, request: Request) -> dict[str, str]:
     sm = request.app.state.session_manager
     
     raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@app.get("/models")
+async def get_models(request: Request) -> list[Model]:
+    """
+    Returns a list of available models.
+    """
+    
+    return request.app.state.config.models
 
 
 @app.get("/workspaces")
