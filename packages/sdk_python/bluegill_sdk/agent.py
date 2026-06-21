@@ -3,7 +3,7 @@ import json
 from typing import AsyncGenerator
 from pydantic import ValidationError
 from bluegill_shared.models import Message, Session, AgentStreamResponse, StreamRequest, NewSessionRequest
-from bluegill_shared.utils import Workspace
+from bluegill_shared.utils import Workspace, Model
 
 from bluegill_sdk.exception import AgentError
 
@@ -21,19 +21,18 @@ class Agent:
         self.provider = provider
         self.model = model
         self._session_id = session_id
-        self.tokens_used = 0
+        self._session_name = ""
+        self._workspace_id = ""
+        self._tokens_used = 0
         self._messages: list[Message] = []
-        self._workspaces: list[Workspace] = []
-        self.timeout = timeout
-        self._client = httpx.Client(timeout=self.timeout)
+        self._timeout = timeout
+        self._client = httpx.Client(timeout=self._timeout)
         
         if session_id:
             self.load_session(session_id)
-            
-        self.load_workspaces()
 
 
-    def new_session(self, workspace_id: str) -> str:
+    def new_session(self, workspace_id: str) -> Session:
         """
         Create a new session and set it as the current session.
         Returns the ID of the new session.
@@ -48,10 +47,12 @@ class Agent:
             
             session = Session.model_validate(response.json())
             self._session_id = session.id
-            self.tokens_used = 0
+            self._session_name = session.name
+            self._workspace_id = workspace_id
+            self._tokens_used = 0
             self._messages = []
             
-            return self._session_id or ""
+            return session
         
         except (httpx.HTTPError, ValidationError) as e:
             raise AgentError("error creating new session", e)
@@ -69,7 +70,7 @@ class Agent:
             response = self._client.post(f"{self.api_url}/sessions/{self.session_id}/clear")
             response.raise_for_status()
             
-            self.tokens_used = 0
+            self._tokens_used = 0
             self._messages = []
             
         except httpx.HTTPError as e:
@@ -94,7 +95,9 @@ class Agent:
                 return False
             
             self._session_id = session_id
-            self.tokens_used = session.tokens_used
+            self._session_name = session.name
+            self._tokens_used = session.tokens_used
+            self._workspace_id = session.workspace_id
             self._load_messages()
             return True
             
@@ -102,7 +105,7 @@ class Agent:
             raise AgentError("error loading session", e)
         
 
-    def load_last_session(self) -> None:
+    def load_last_session(self) -> Session:
         """
         Set the last active session as the active session.
         """
@@ -113,8 +116,12 @@ class Agent:
 
             session = Session.model_validate(response.json())
             self._session_id = session.id
-            self.tokens_used = session.tokens_used
+            self._session_name = session.name
+            self._workspace_id = session.workspace_id
+            self._tokens_used = session.tokens_used
             self._load_messages()
+            
+            return session
             
         except httpx.HTTPStatusError as e:
             raise AgentError("No sessions available") from e
@@ -122,17 +129,6 @@ class Agent:
         except (httpx.HTTPError, ValidationError) as e:
             raise AgentError("error loading last session")
         
-        
-    def load_workspaces(self) -> None:
-        try:
-            response = self._client.get(f"{self.api_url}/workspaces")
-            response.raise_for_status()
-            
-            self._workspaces = [Workspace.model_validate(w) for w in response.json()]
-        
-        except (httpx.HTTPError, ValidationError) as e:
-            raise AgentError("Error loading workspaces") from e
-            
         
     def get_sessions(self) -> list[Session]:
         """
@@ -147,7 +143,37 @@ class Agent:
         
         except (httpx.HTTPError, ValidationError) as e:
             raise AgentError("error retrieving session list", e)
-
+        
+        
+    def get_workspaces(self) -> list[Workspace]:
+        """
+        Retrieve the list of available agent workspaces.
+        """
+        
+        try:
+            response = self._client.get(f"{self.api_url}/workspaces")
+            response.raise_for_status()
+            
+            return [Workspace.model_validate(w) for w in response.json()]
+        
+        except (httpx.HTTPError, ValidationError) as e:
+            raise AgentError("Error retrieving workspaces") from e
+        
+        
+    def get_models(self) -> list[Model]:
+        """
+        Retrieve the list of available models.    
+        """
+        
+        try:
+            response = self._client.get(f"{self.api_url}/models")
+            response.raise_for_status()
+            
+            return [Model.model_validate(m) for m in response.json()]
+        
+        except (httpx.HTTPError, ValidationError) as e:
+            raise AgentError("Error retrieving models") from e
+            
 
     def dump(self, session_id: str | None) -> list[Message]:
         """
@@ -257,7 +283,8 @@ class Agent:
         else:
             self._session_id = None
             self._messages = []
-            self.tokens_used = 0
+            self._tokens_used = 0
+            self._workspace_id = None
 
     
     @property
@@ -266,8 +293,23 @@ class Agent:
     
     
     @property
-    def workspaces(self) -> list[Workspace]:       
-        return self._workspaces
+    def workspace_id(self) -> str | None:
+        return self._workspace_id
+    
+    
+    @property
+    def tokens_used(self) -> int:
+        return self._tokens_used
+    
+    
+    @property
+    def timeout(self) -> int:
+        return self._timeout
+    
+    
+    @property
+    def session_name(self) -> str:
+        return self._session_name
     
     
     # ------------------------
