@@ -10,8 +10,9 @@ class LLMStreamResponse(BaseModel):
         
         created_at: The timestamp in UTC of when this chunk was created.
     
-        response: empty if the response was streamed, if not streamed, 
-                   this will contain the full response.
+        response: The final generated response from the model.
+                   
+        thinking: The model's thinking if requested. 
                    
         done: True if this is the last chunk in the stream. False otherwise.
 
@@ -23,6 +24,7 @@ class LLMStreamResponse(BaseModel):
     model: str
     created_at: str
     response: str = ""
+    thinking: str | None = None
     done: bool = False
     total_duration: int | None = None
     token_count: int | None = None

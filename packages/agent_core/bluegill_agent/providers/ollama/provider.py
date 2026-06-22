@@ -61,7 +61,8 @@ class LocalOllamaProvider(BaseLLMProvider):
         model: str,
         messages: list[Message],
         system_prompt: str,
-        window: int = 8000
+        window: int = 8000,
+        think: bool = False
     ) -> AsyncGenerator[LLMStreamResponse, None]:
         async with httpx.AsyncClient(timeout=None) as client:
             try:
@@ -72,7 +73,7 @@ class LocalOllamaProvider(BaseLLMProvider):
                         "model": model,
                         "prompt": self.format_messages(messages),
                         "stream": True,
-                        "think": False,
+                        "think": think,
                         "system": system_prompt,
                         "options": {"num_ctx": window}
                     },

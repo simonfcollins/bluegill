@@ -13,8 +13,9 @@ class OllamaStreamResponse(BaseModel):
         
         created_at: The timestamp in UTC of when this chunk was created.
     
-        response: empty if the response was streamed, if not streamed, 
-                   this will contain the full response.
+        response: The final generated response from the model.
+                   
+        thinking: The model's thinking if requested. 
                    
         done: True if this is the last chunk in the stream. False otherwise.
         
@@ -40,6 +41,7 @@ class OllamaStreamResponse(BaseModel):
     model: str
     created_at: str
     response: str = ""
+    thinking: str | None = None
     done: bool = False
     context: list[int] | None = None
     total_duration: int | None = None
@@ -71,6 +73,7 @@ class OllamaStreamResponse(BaseModel):
             model=self.model,
             created_at=self.created_at,
             response=self.response,
+            thinking=self.thinking,
             done=self.done,
             total_duration=self.total_duration,
             token_count=token_count

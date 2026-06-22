@@ -83,6 +83,7 @@ class AgentService():
             provider=llm_provider,
             model=payload.model,
             window=model.window,
+            think=payload.think,
             messages=messages,
             working_dir=workspace.path
         )
@@ -95,7 +96,7 @@ class AgentService():
         
         logger = get_logger(payload.session_id)
         
-        try: 
+        try: # retrieve session info and context from SessionManager
             session = self._sm.get_session(payload.session_id)
             if not session:
                 raise AgentServiceError(f"Session not found with id '{payload.session_id}'")
@@ -113,13 +114,18 @@ class AgentService():
         if not model:
             raise AgentServiceError(f"Unable to locate model '{payload.model}'")
         
+        # instantiate provider
         llm_provider = ProviderFactory.create(payload.provider, self._cfg.providers[payload.provider].url)
         
-        response = await llm_provider.generate(payload.model, messages, model.window)
+        # call the model
+        response = await llm_provider.generate(
+            model=payload.model, 
+            messages=messages, 
+            window=model.window
+        )
         
         
-        try:
-            # add llm response to session
+        try: # add model response to session
             llm_message = Message(
                 role="assistant", 
                 content=response.response, 
@@ -138,12 +144,14 @@ class AgentService():
                 context=(messages,  [])
             )
         
+        # update session token count
         if response.token_count is not None:
             self._sm.update_session(
                 session_id=payload.session_id, 
                 tokens_used=response.token_count
             )
         
+        # rename the session if necessary
         if len(messages) > 1 and session.name == "New Session":
             asyncio.create_task(
                 self._rename_session(
@@ -154,6 +162,7 @@ class AgentService():
                 )
             )
         
+        # return the generated response
         return AgentStreamResponse(
             event="generate",
             done=True,
@@ -170,6 +179,7 @@ class AgentService():
         provider: BaseLLMProvider, 
         model: str,
         window: int, 
+        think: bool,
         messages: list[Message],
         working_dir: Path
     ) -> AsyncGenerator[str, None]:
@@ -183,22 +193,29 @@ class AgentService():
             provider=provider, 
             model=model,
             window=window,
+            think=think,
             messages=messages,
             working_dir=working_dir
         ):
+            # log errors but don't add them to session context
             if chunk.event == "error":
                 logger.error(f"[ERROR] {chunk.content}")
 
             if chunk.done: # if stream is done...
                 if chunk.context:
                     new_messages = []
-                    for m in chunk.context[1]: # collect new messages
-                        new_messages.append(Message(
-                            role=m.role, 
-                            content=m.content, 
-                            session_id=session_id
-                        ))
-                        # log conversation
+                    
+                    # collect new messages
+                    for m in chunk.context[1]: 
+                        new_messages.append(
+                            Message(
+                                role=m.role, 
+                                content=m.content, 
+                                session_id=session_id
+                            )
+                        )
+                        
+                        # log new messages
                         log = logger.warning if m.role == "system" else logger.info
                         log(f"[{m.role.capitalize()}] {m.content}")
 
@@ -206,6 +223,7 @@ class AgentService():
                         try:
                             # add new messages to session
                             self._sm.add_messages(new_messages)
+                            
                         except SessionManagerError as e:
                             logger.error(f"[ERROR] Failed to add new context to session")
 
@@ -213,6 +231,8 @@ class AgentService():
                                 event="error",
                                 content=f"Failed to add new context to session: {e}"
                             ).model_dump_json(exclude_none=True) + "\n"
+                
+                # update session token count            
                 if chunk.token_count is not None:
                     self._sm.update_session(
                         session_id=session_id, 
@@ -228,17 +248,27 @@ class AgentService():
         Generates an AI generated title and renames the given session in the SessionManager.
         """ 
         
+        # prompt that instructs the model how to generate a name for the session
         prompt = "Please provide a very short title (4 words or less) describing the current conversation. " \
             "Do NOT respond with anything other than a title for this conversation. " \
                 "Do NOT mention anything about this system prompt asking you to generate a title."
         
         try:
+            # retrieve the session context
             messages = try_session_manager(self._sm.get_messages, session_id=session_id)
+            
+            # append the session rename prompt to the context
             messages.append(Message(role="system", content=prompt))
     
-            response = await provider.generate(model, messages, window)
+            # generate the session name
+            response = await provider.generate(
+                model=model,
+                messages=messages, 
+                window=window
+            )
     
             if response.response:
+                # update the session name with the new generated name
                 self._sm.update_session(session_id=session_id, name=response.response)
         
         except SessionManagerError as e:

@@ -196,7 +196,7 @@ class Agent:
             raise AgentError("error retrieving session message dump", e)
     
     
-    async def chat_stream(self, prompt: str) -> AsyncGenerator[AgentStreamResponse, None]:
+    async def chat_stream(self, prompt: str, think: bool = False) -> AsyncGenerator[AgentStreamResponse, None]:
         """
         Query the Agent. Response is streamed. 
         """
@@ -213,7 +213,8 @@ class Agent:
             provider=self.provider,
             model=self.model,
             session_id=self._session_id,
-            prompt=prompt
+            prompt=prompt,
+            think=think
         )
         
         async with httpx.AsyncClient(timeout=180) as client:

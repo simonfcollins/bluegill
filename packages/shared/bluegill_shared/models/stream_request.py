@@ -12,9 +12,12 @@ class StreamRequest(BaseModel):
         session_id: A valid session id. Messages generated in this request will be added to the given session.
         
         prompt: The user's prompt.
+        
+        think: True if the agent should show thinking. False otherwise.
     """
     
     provider: str
     model: str
     session_id: str
     prompt: str
+    think: bool = False

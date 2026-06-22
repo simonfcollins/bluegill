@@ -4,7 +4,7 @@ from typing import Literal
 from bluegill_shared.models.message import Message
 
 
-AgentEvent = Literal["generate", "tool_call", "tool_result", "error"]
+AgentEvent = Literal["generate", "thinking", "tool_call", "tool_result", "error"]
 
 
 class AgentStreamResponse(BaseModel):
@@ -14,6 +14,8 @@ class AgentStreamResponse(BaseModel):
     Attributes:
         type: The type of message this chunk contains. Possible values are:
             - generate: The response contains standard LLM output.
+            
+            - thinking: The response contains thinking from the model.
 
             - tool_call: The response contains a formatted tool call.
 

@@ -64,7 +64,8 @@ async def run_agent(
     model: str, 
     messages: list[Message], 
     window: int,
-    working_dir: Path
+    working_dir: Path,
+    think: bool = False
 ) -> AsyncGenerator[AgentStreamResponse, None]:
     
     # Need: model name, provider name, provider url, window, and messages
@@ -124,13 +125,21 @@ async def run_agent(
                 model=model,
                 messages=full_context,
                 system_prompt=SYSTEM_PROMPT, 
-                window=window
+                window=window,
+                think=think
             ):
                 if chunk.done:
                     total_duration += chunk.total_duration or 0
                     token_count += chunk.token_count or 0
                     stream_complete = True
                     break
+                
+                if chunk.thinking:
+                    yield AgentStreamResponse(
+                        event="thinking",
+                        content=chunk.thinking,
+                    )
+                    continue
                 
                 buffer_str += chunk.response
 
