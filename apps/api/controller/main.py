@@ -188,3 +188,14 @@ async def get_workspaces(request: Request) -> list[Workspace]:
     
     return wr.workspaces
         
+        
+@app.post("/refresh")
+async def reload_config(request: Request) -> dict[str, str]:
+    """
+    Reloads the config file.
+    """
+    
+    request.app.state.config = load_config()
+    
+    return {"status": "config reloaded"}
+    
