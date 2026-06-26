@@ -334,12 +334,12 @@ async def run_agent(
                 except JSONParseError:
                     create_message(
                         "system", 
-                        f"Error parsing JSON. Your previous response was malformed and could not be parsed. Please try again\nAgent response: {t}"
+                        f"Assistant provided malformed tool call: {t}"
                     )
 
                     yield AgentStreamResponse(
                         event="error",
-                        content=f"Error parsing JSON. Your previous response was malformed and could not be parsed. Please try again\nAgent response: {t}"
+                        content=f"Assistant provided malformed tool call: {t}"
                     )
 
                 except Exception:
