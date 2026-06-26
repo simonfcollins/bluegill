@@ -1,0 +1,19 @@
+#input {
+    min-height: 3;
+    max-height: 10;
+    height: auto;
+}
+
+#title_bar {
+    height: auto;
+    padding: 1 2 1 2;
+}
+
+#title {
+    text-style: bold;
+    content-align: left middle;
+    height: 100%;
+    width: 1fr;
+}
+
+

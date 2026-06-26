@@ -1,0 +1,43 @@
+InfoBar {
+    height: auto;
+    padding: 1 1 1 1;
+    layout: vertical;
+}
+
+.info-bar-horizontal {
+    height: auto;
+    align: right middle;
+}
+
+.info-bar-item {
+    margin-left: 4;
+    width: auto;
+    align: right middle;
+    text-align: center;
+}
+
+.info-bar-label {
+    width: auto;
+    margin-right: 1;
+    align: right middle;
+    text-align: right;
+}
+
+
+.token-bar {
+    width: auto;
+    align: right middle;
+}
+
+.info-bar-usage {
+    height: auto;
+    align: right middle;
+    padding: 1 0 0 0;
+}
+
+.thinking-switch {
+    width: auto;
+    height: 1;
+    border: none;
+    padding: 0 0 0 0;
+}

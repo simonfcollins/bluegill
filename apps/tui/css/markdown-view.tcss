@@ -1,0 +1,19 @@
+MarkdownView > Label {
+    width: 1fr;
+    height: auto
+}
+
+MarkdownView > Static {
+    width: 1fr;
+    height: auto;
+}
+
+MarkdownView > Markdown {
+    padding: 0;
+    margin: 0;
+    height: auto;
+}
+
+MarkdownView {
+    height: auto;
+}

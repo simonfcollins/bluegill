@@ -1,0 +1,3 @@
+ChatInput .text-area--cursor-line {
+    background: transparent;
+}

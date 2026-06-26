@@ -1,0 +1,34 @@
+ItemSelectModal {
+    align: center middle;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+ItemSelectModal > Container {
+    width: 60%;
+    height: 50%;
+    background: $surface;
+    padding: 1;
+}
+
+.ism-title {
+    padding-bottom: 1;
+    text-style: bold;
+    text-align: center;
+    width: 100%;
+}
+
+.ism-list {
+    background: $surface;
+}
+
+.ism-item {
+    width: 100%;
+    align: left middle;
+    padding: 0 1;
+
+}
+
+.ism-item-label {
+    width: 100%;
+}
+

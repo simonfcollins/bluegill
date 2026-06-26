@@ -1,0 +1,4 @@
+textual>=8.2.1
+rich>=14.3.3
+textual[syntax]
+pyperclip

@@ -1,0 +1,11 @@
+Screen {
+    layout: vertical;
+}
+
+ToastRack {
+    padding: 1 0;
+}
+
+.switch--slider {
+    background: $surface;
+}
