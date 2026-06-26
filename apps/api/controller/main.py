@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from bluegill_shared.models import Message, Session, StreamRequest, AgentStreamResponse, NewSessionRequest
-from bluegill_shared.utils import load_config, Workspace, Model
+from bluegill_shared.utils import load_config, Workspace, Model, Config
 
 from api.service.session_manager import SessionManager
 from api.service.agent_service import AgentService
@@ -16,6 +16,9 @@ from api.helper.try_session_manager import try_session_manager
 from api.service.workspace_registry import WorkspaceRegistry
 
 
+CONFIG_PATH = Path("~/.bluegill/config.json").expanduser().resolve()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
@@ -23,7 +26,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     
     sm = SessionManager(SessionRepository(), MessageRepository())
-    cfg = load_config()
+    cfg = load_config(CONFIG_PATH)
     wr = WorkspaceRegistry(list(cfg.workspaces.values()), Path("/home/assistant/workspaces"))
     
     app.state.session_manager = sm
@@ -188,14 +191,12 @@ async def get_workspaces(request: Request) -> list[Workspace]:
     
     return wr.workspaces
         
-        
-@app.post("/refresh")
-async def reload_config(request: Request) -> dict[str, str]:
+
+@app.get("/config")
+async def get_config(request: Request) -> Config:
     """
-    Reloads the config file.
+    Returns the loaded config object.
     """
     
-    request.app.state.config = load_config()
-    
-    return {"status": "config reloaded"}
+    return request.app.state.config
     

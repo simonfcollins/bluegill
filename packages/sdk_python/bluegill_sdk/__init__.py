@@ -1,7 +1,8 @@
 from .agent import Agent
-from .exception import AgentError
+from .exception import AgentError, NotFoundError
 
 __all__ = [
     "Agent",
-    "AgentError"
+    "AgentError",
+    "NotFoundError"
 ]

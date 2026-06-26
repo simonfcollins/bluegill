@@ -1,12 +1,7 @@
 from pathlib import Path
 import json
 from pydantic import BaseModel, ValidationError, Field
-
-
-BASE_DIR = Path.home() / ".bluegill"
-BASE_DIR.mkdir(exist_ok=True)
-
-CONFIG_FILE = BASE_DIR / "config.json"
+from typing import Any
 
 
 class Workspace(BaseModel):
@@ -94,7 +89,7 @@ class Config(BaseModel):
         
         providers: A dict of providers.
         
-        models: A dict of language models.
+        models: A list of language models.
 
         agent: An Agent.
     """
@@ -117,6 +112,18 @@ class Config(BaseModel):
             if m.name == model and m.provider == provider    
             ), None
         )
+        
+        
+    def normalized(self) -> dict[str, Any]:
+        """
+        Returns a normalized dictionary representation of this Config.
+        """
+        return {
+            "workspaces": [w.model_dump() for w in self.workspaces.values()],
+            "providers": [p.model_dump() for p in self.providers.values()],
+            "models": [m.model_dump() for m in self.models],
+            "agent": self.agent.model_dump()
+        }
     
 
 def format_config_error(e: ValidationError) -> str:
@@ -136,11 +143,15 @@ def format_config_error(e: ValidationError) -> str:
     return "\n".join(lines)
 
 
-def load_config() -> Config:
-    if not CONFIG_FILE.exists():
+def load_config(path: Path) -> Config:
+    """
+    Reads and parses the config file at the given path returning a Config object.
+    """
+    
+    if not path.exists():
         return Config()
 
-    with CONFIG_FILE.open("r") as f:
+    with path.open("r") as f:
         data = json.load(f)
 
     try:

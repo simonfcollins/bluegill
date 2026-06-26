@@ -3,9 +3,9 @@ import json
 from typing import AsyncGenerator
 from pydantic import ValidationError
 from bluegill_shared.models import Message, Session, AgentStreamResponse, StreamRequest, NewSessionRequest
-from bluegill_shared.utils import Workspace, Model
+from bluegill_shared.utils import Workspace, Model, Config
 
-from bluegill_sdk.exception import AgentError
+from bluegill_sdk.exception import AgentError, NotFoundError
 
 
 class Agent:
@@ -25,6 +25,7 @@ class Agent:
         self._workspace_id = ""
         self._tokens_used = 0
         self._messages: list[Message] = []
+        self._config = None
         self._timeout = timeout
         self._client = httpx.Client(timeout=self._timeout)
         
@@ -55,7 +56,7 @@ class Agent:
             return session
         
         except (httpx.HTTPError, ValidationError) as e:
-            raise AgentError("error creating new session", e)
+            raise AgentError("Error creating new session") from e
         
     
     def clear_session(self) -> None:
@@ -74,7 +75,7 @@ class Agent:
             self._messages = []
             
         except httpx.HTTPError as e:
-            raise AgentError(f"error clearing session '{self.session_id}'", e)
+            raise AgentError(f"Error clearing session '{self.session_id}'") from e
         
     
     def load_session(self, session_id: str) -> bool:
@@ -102,7 +103,7 @@ class Agent:
             return True
             
         except (httpx.HTTPError, ValidationError) as e:
-            raise AgentError("error loading session", e)
+            raise AgentError("Error loading session") from e
         
 
     def load_last_session(self) -> Session:
@@ -124,10 +125,13 @@ class Agent:
             return session
             
         except httpx.HTTPStatusError as e:
-            raise AgentError("No sessions available") from e
+            if e.response.status_code == 404:
+                raise NotFoundError("No sessions found") from e
+            
+            raise AgentError("Error loading last session") from e
 
         except (httpx.HTTPError, ValidationError) as e:
-            raise AgentError("error loading last session")
+            raise AgentError("Error loading last session") from e
         
         
     def get_sessions(self) -> list[Session]:
@@ -142,37 +146,24 @@ class Agent:
             return [Session.model_validate(s) for s in r.json()]
         
         except (httpx.HTTPError, ValidationError) as e:
-            raise AgentError("error retrieving session list", e)
+            raise AgentError("Error retrieving session list") from e
         
         
-    def get_workspaces(self) -> list[Workspace]:
+    def load_config(self) -> Config:
         """
-        Retrieve the list of available agent workspaces.
-        """
-        
-        try:
-            response = self._client.get(f"{self.api_url}/workspaces")
-            response.raise_for_status()
-            
-            return [Workspace.model_validate(w) for w in response.json()]
-        
-        except (httpx.HTTPError, ValidationError) as e:
-            raise AgentError("Error retrieving workspaces") from e
-        
-        
-    def get_models(self) -> list[Model]:
-        """
-        Retrieve the list of available models.    
+        Reloads the server config file.
         """
         
         try:
-            response = self._client.get(f"{self.api_url}/models")
-            response.raise_for_status()
+            get_response = self._client.get(f"{self.api_url}/config")
+            get_response.raise_for_status()
             
-            return [Model.model_validate(m) for m in response.json()]
+            self._config = Config.model_validate(get_response.json())
+            
+            return self._config
         
         except (httpx.HTTPError, ValidationError) as e:
-            raise AgentError("Error retrieving models") from e
+            raise AgentError("Error retrieving config") from e
             
 
     def dump(self, session_id: str | None) -> list[Message]:
@@ -193,7 +184,7 @@ class Agent:
             return [Message.model_validate(m) for m in r.json()]
 
         except (httpx.HTTPError, ValidationError) as e:
-            raise AgentError("error retrieving session message dump", e)
+            raise AgentError("Error retrieving session message dump") from e
     
     
     async def chat_stream(self, prompt: str, think: bool = False) -> AsyncGenerator[AgentStreamResponse, None]:
@@ -241,8 +232,10 @@ class Agent:
                         continue
 
                     data = json.loads(line)
+                    
                     try:
                         yield AgentStreamResponse.model_validate(data)
+                        
                     except ValidationError as e:
                         yield AgentStreamResponse(
                             event="error",
@@ -286,6 +279,21 @@ class Agent:
             self._messages = []
             self._tokens_used = 0
             self._workspace_id = None
+            
+            
+    @property
+    def config(self) -> Config:
+        return self._config or self.load_config()
+    
+    
+    @property
+    def models(self) -> list[Model]:
+        return self.config.models
+    
+    
+    @property
+    def workspaces(self) -> list[Workspace]:
+        return list(self.config.workspaces.values())
 
     
     @property

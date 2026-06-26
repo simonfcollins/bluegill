@@ -1,6 +1,6 @@
 import subprocess
 from pathlib import Path
-from bluegill_shared.utils import Config, load_config
+from bluegill_shared.utils import load_config
 
 
 BASE_DIR = Path.home() / ".bluegill"
@@ -117,7 +117,7 @@ def launch_agent() -> None:
         
     # prepare the workspaces for bind mounting
     mounts = []
-    cfg = load_config()
+    cfg = load_config(BASE_DIR / "config.json")
 
     # DEFAULT_WORKSPACE.mkdir(exist_ok=True)
     # mounts.extend(["-v", f"{DEFAULT_WORKSPACE}:{DOCKER_BASE_DIR / 'default'}"])

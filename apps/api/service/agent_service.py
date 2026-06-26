@@ -197,6 +197,10 @@ class AgentService():
             messages=messages,
             working_dir=working_dir
         ):
+            
+            # yield the agent response
+            yield chunk.model_dump_json(exclude_none=True) + "\n"
+
             # log errors but don't add them to session context
             if chunk.event == "error":
                 logger.error(f"[ERROR] {chunk.content}")
@@ -238,9 +242,6 @@ class AgentService():
                         session_id=session_id, 
                         tokens_used=chunk.token_count
                     )
-            
-            # yield the agent response
-            yield chunk.model_dump_json(exclude_none=True) + "\n"
 
 
     async def _rename_session(self, session_id: str, provider: BaseLLMProvider, model: str, window: int) -> None:

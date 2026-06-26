@@ -35,7 +35,12 @@ class WorkspaceRegistry:
             
             
     def get(self, workspace_id: str) -> Workspace:
+        """
+        Retrieve a workspace by ID.
+        """
+
         return self._workspaces[workspace_id]
+    
     
     @property
     def workspaces(self) -> list[Workspace]:

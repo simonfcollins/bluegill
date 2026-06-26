@@ -92,11 +92,11 @@ class LocalOllamaProvider(BaseLLMProvider):
                             yield LLMStreamResponse(
                                 model=model,
                                 created_at=datetime.now(UTC).isoformat(),
-                                response=f"unexpected response from provider: '{line}'"
+                                response=f"Unexpected response from provider: '{line}'"
                             )
 
             except httpx.ConnectError as e:
-                raise ProviderError(f"could not reach ollama at '{self.base_url}'") from e
+                raise ProviderError(f"Could not reach ollama at '{self.base_url}'") from e
                         
     
     async def model_exists(self, model: str) -> bool:
@@ -104,17 +104,17 @@ class LocalOllamaProvider(BaseLLMProvider):
             try:
                 response = await client.get(f"{self.base_url}/api/tags")
             except httpx.ConnectError as e:
-                raise ProviderError(f"could not reach ollama at '{self.base_url}'") from e
+                raise ProviderError(f"Could not reach ollama at '{self.base_url}'") from e
             
             try:
                 response.raise_for_status()
             except httpx.HTTPStatusError as e:
-                raise ProviderError(f"ollama responded with status code {e.response.status_code}: '{e.response.text}'") from e
+                raise ProviderError(f"Ollama responded with status code {e.response.status_code}: '{e.response.text}'") from e
             
             try:
                 data = response.json()
             except ValueError as e:
-                raise ProviderError("invalid JSON response from provider") from e
+                raise ProviderError("Invalid JSON response from provider") from e
             
             models = data.get("models", [])
             
