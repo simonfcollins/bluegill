@@ -243,6 +243,20 @@ class Agent:
                         )
         
         self.load_session(self._session_id)
+        
+        
+    def service_running(self) -> bool:
+        """
+        Returns true if the Bluegill agent service is running.
+        False otherwise.
+        """
+        
+        try:
+            self._client.get(f"{self.api_url}/health")
+            return True
+            
+        except httpx.HTTPError:
+            return False
     
 
     def close(self) -> None:
