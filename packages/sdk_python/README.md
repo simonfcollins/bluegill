@@ -12,6 +12,7 @@ A lightweight Python SDK for interacting with the Bluegill API. This SDK provide
 * Provider and model configuration
 * Automatic message tracking
 * Async streaming responses
+* Supports the following LLM providers: 'Ollama'
 
 ---
 
@@ -38,8 +39,11 @@ async def main():
         model="qwen3-coder:latest"
     )
 
-    # Create a new session
-    agent.new_session()
+    workspaces = agent.workspaces
+
+    if workspaces:
+        # Create a new session (workspace required)
+        agent.new_session(workspace_id=workspaces[0].id)
 
     # Stream a response
     async for chunk in agent.chat_stream("Hello, how are you?"):
@@ -56,13 +60,13 @@ asyncio.run(main())
 
 ### Agent Parameters
 
-| Parameter  | Type | Description                                    |
+| Parameter  | Type | Description |
 | ---------- | ---- | ---------------------------------------------- |
-| api_url    | str  | URL of the Bluegill API                        |
+| api_url    | str  | URL of the Bluegill API |
 | provider   | str  | Model provider (currently supports: `ollama`) |
-| model      | str  | Model name                                     |
-| session_id | str  | Existing session ID                            |
-| timeout    | int  | Request timeout in seconds                     |
+| model      | str  | Model name |
+| session_id | str  | Existing session ID (optional) |
+| timeout    | int  | Request timeout in seconds |
 
 ---
 
@@ -78,13 +82,29 @@ sessions = agent.get_sessions()
 
 ---
 
-### new_session()
+### new_session(workspace_id)
 
-Create and activate a new session.
+Create and activate a new session in a workspace.
 
 ```python
-session_id = agent.new_session()
+session = agent.new_session(workspace_id="workspace-id")
 ```
+
+Returns a `Session`.
+
+---
+
+### load_session(session_id)
+
+Load a session by session ID.
+
+```python
+success = agent.load_session("session-id")
+```
+
+Returns:
+- True if successfully loaded
+- False otherwise
 
 ---
 
@@ -108,25 +128,37 @@ agent.clear_session()
 
 ---
 
-### chat_stream(prompt)
+### chat_stream(prompt, think=False)
 
 Send a prompt to the model and receive a streamed response.
 
 ```python
-async for chunk in agent.chat_stream("Explain recursion"):
+async for chunk in agent.chat_stream("Explain recursion", think=False):
     print(chunk.content, end="")
 ```
 
-Returns an `AsyncGenerator[AgentStreamResponse, None]`.
+Returns an AsyncGenerator[AgentStreamResponse, None].
 
 ---
 
-### dump()
+### dump(session_id)
 
 Retrieve full session message history.
 
 ```python
-messages = agent.dump()
+messages = agent.dump(session_id="session-id")
+```
+
+Returns list[Message].
+
+---
+
+### service_running()
+
+Check if the Bluegill API service is running.
+
+```python
+agent.service_running()
 ```
 
 ---
@@ -148,7 +180,7 @@ agent.close()
 Get or set the model provider.
 
 ```python
-agent.provider = "ollama"
+agent.provider = `ollama`
 ```
 
 ---
@@ -158,7 +190,7 @@ agent.provider = "ollama"
 Get or set the active session ID.
 
 ```python
-agent.session_id = "your-session-id"
+agent.session_id = `your-session-id`
 ```
 
 ---
@@ -173,42 +205,12 @@ history = agent.messages
 
 ---
 
-## Validation
+### workspaces
 
-* Only supported providers are allowed.
-* Currently supported providers:
-
-  * `ollama`
-
----
-
-## Example Workflow
+List available workspaces from server config.
 
 ```python
-import asyncio
-from agent import Agent
-
-async def main():
-    agent = Agent(provider="ollama", model="qwen3-coder")
-
-    agent.new_session()
-
-    async for chunk in agent.chat_stream("What is Python?"):
-        print(chunk.content, end="")
-
-    print("\n")
-
-    async for chunk in agent.chat_stream("Explain it like I'm five."):
-        print(chunk.content, end="")
-
-    print("\n")
-
-    for m in agent.messages:
-        print(f"{m.role}: {m.content}\n")
-
-    agent.close()
-
-asyncio.run(main())
+workspaces = agent.workspaces
 ```
 
 ---
@@ -216,6 +218,7 @@ asyncio.run(main())
 ## Error Handling
 
 * HTTP and API errors raise `AgentError`.
+* Missing resources raise `NotFoundError`.
 * Stream validation failures emit an error event in the stream.
 
 Example:
@@ -232,8 +235,9 @@ async for chunk in agent.chat_stream("Hello"):
 
 * Ensure the Bluegill API is running before making requests.
 * Session state is maintained server-side.
-* Messages are also cached locally in the Agent instance.
-* `chat_stream()` requires an active session, provider, and model.
+* Messages are cached locally in the Agent instance.
+* chat_stream() requires an active session, provider, model, and workspace.
+* Streaming is async-only.
 
 ---
 
