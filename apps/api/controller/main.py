@@ -16,7 +16,7 @@ from api.helper.try_session_manager import try_session_manager
 from api.service.workspace_registry import WorkspaceRegistry
 
 
-CONFIG_PATH = Path("~/.bluegill/config.json").expanduser().resolve()
+CONFIG_PATH = Path("~/.bluegill/runtime/config.json").expanduser().resolve()
 
 
 @asynccontextmanager
@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     
     sm = SessionManager(SessionRepository(), MessageRepository())
-    cfg = load_config(CONFIG_PATH).dockerize()
+    cfg = load_config(CONFIG_PATH)
     wr = WorkspaceRegistry(list(cfg.workspaces.values()), Path("/home/assistant/workspaces"))
     
     app.state.session_manager = sm

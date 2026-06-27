@@ -159,10 +159,10 @@ class Config(BaseModel):
         Returns a normalized dictionary representation of this Config.
         """
         return {
-            "workspaces": [w.model_dump() for w in self.workspaces.values()],
-            "providers": [p.model_dump() for p in self.providers.values()],
-            "models": [m.model_dump() for m in self.models],
-            "agent": self.agent.model_dump()
+            "workspaces": [w.model_dump(mode="json") for w in self.workspaces.values()],
+            "providers": [p.model_dump(mode="json") for p in self.providers.values()],
+            "models": [m.model_dump(mode="json") for m in self.models],
+            "agent": self.agent.model_dump(mode="json"),
         }
     
 

@@ -1,6 +1,8 @@
 import subprocess
+import platform
 from pathlib import Path
-from bluegill_shared.utils import load_config
+import json
+from bluegill_shared.utils import load_config, Config
 
 
 BASE_DIR = Path.home() / ".bluegill"
@@ -89,6 +91,27 @@ def pull_docker_image() -> str:
     return result.stdout
 
 
+def create_runtime_config() -> Config:
+    """
+    Creates a runtime config file for the Bluegill service.
+    """
+    
+    src = BASE_DIR / "config.json"
+    dst_dir = BASE_DIR / "runtime/"
+    dst = dst_dir / "config.json"
+    
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
+    cfg = load_config(src)
+
+    if platform.system() in ("Darwin", "Windows"):
+        cfg = cfg.dockerize()
+
+    dst.write_text(json.dumps(cfg.normalized(), indent=4))
+    
+    return cfg
+
+
 def launch_agent() -> None:
     """
     Launch a Docker container from the bluegill_agent:latest image. 
@@ -117,27 +140,36 @@ def launch_agent() -> None:
         
     # prepare the workspaces for bind mounting
     mounts = []
-    cfg = load_config(BASE_DIR / "config.json")
-
-    # DEFAULT_WORKSPACE.mkdir(exist_ok=True)
-    # mounts.extend(["-v", f"{DEFAULT_WORKSPACE}:{DOCKER_BASE_DIR / 'default'}"])
+    cfg = create_runtime_config()
     
     for w in list(cfg.workspaces.values()):
         mounts.extend(["-v", f"{Path(w.path).expanduser().resolve()}:{DOCKER_BASE_DIR / w.id}"])
         
     # docker launch command
-    cmd = [
-        "docker", "run", "--rm",        
-        "--add-host=host.docker.internal:host-gateway",
-        "-p", "54345:54345",
-        "-v", f"{BASE_DIR}:/home/{DOCKER_USER}/.bluegill",
-        *mounts,
-        DOCKER_IMAGE
-    ]
+    
+    if platform.system() == "Linux":
+        cmd = [
+            "docker", "run", "--rm",
+            "--network", "host",
+            "-v", f"{BASE_DIR}:/home/{DOCKER_USER}/.bluegill",
+            *mounts,
+            DOCKER_IMAGE
+        ]
+        
+    else:
+        cmd = [
+            "docker", "run", "--rm",
+            "--add-host=host.docker.internal:host-gateway",
+            "-p", "54345:54345",
+            "-v", f"{BASE_DIR}:/home/{DOCKER_USER}/.bluegill",
+            *mounts,
+            DOCKER_IMAGE
+        ]
     
     try:
         print("Launching agent:\n", " ".join(cmd))
         subprocess.run(cmd)
+        
     except KeyboardInterrupt:
         print("Agent stopped")
     
