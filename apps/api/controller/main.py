@@ -221,19 +221,19 @@ async def status(request: Request) -> dict[str, Any]:
             detail = {"status": "not_ready", "configured": False, "reason": reason}
         )
     
-    if not get_providers(request):
+    if not await get_providers(request):
         not_ready((
                     "Bad config: No providers detected.\n"
                     "Add a provider to config and reload service."
                 ))
 
-    if not get_models(request):
+    if not await get_models(request):
         not_ready((
                     "Bad config: No models detected.\n"
                     "Add a model to config and reload service."
                 ))
         
-    if not get_workspaces(request):
+    if not await get_workspaces(request):
         not_ready((
                     "Bad config: No workspaces detected.\n"
                     "Add a workspace to config and reload service."
