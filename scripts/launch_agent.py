@@ -127,8 +127,9 @@ def launch_agent() -> None:
         
     # docker launch command
     cmd = [
-        "docker", "run", "--rm",
-        "--network=host",
+        "docker", "run", "--rm",        
+        "--add-host=host.docker.internal:host-gateway",
+        "-p", "54345:54345",
         "-v", f"{BASE_DIR}:/home/{DOCKER_USER}/.bluegill",
         *mounts,
         DOCKER_IMAGE

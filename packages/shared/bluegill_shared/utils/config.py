@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 from pydantic import BaseModel, ValidationError, Field
 from typing import Any
+from urllib.parse import urlparse, urlunparse
 
 
 class Workspace(BaseModel):
@@ -113,7 +114,46 @@ class Config(BaseModel):
             ), None
         )
         
+
+    def dockerize(self) -> "Config":
+        """
+        Returns a Docker-compatible copy of this Config.
+        Converts provider URLs like '127.0.0.1' or localhost
+        """
+
+        LOOPBACK_HOSTS = {
+            "localhost",
+            "127.0.0.1",
+            "::1",
+        }
+
+        def to_docker_url(url: str) -> str:        
         
+            parsed = urlparse(url)
+
+            if parsed.hostname not in LOOPBACK_HOSTS:
+                return url
+
+            host = "host.docker.internal"
+            if parsed.port is not None:
+                host = f"{host}:{parsed.port}"
+
+            return urlunparse(parsed._replace(netloc=host))
+        
+        return Config(
+            workspaces=self.workspaces,
+            providers={
+                k: Provider(
+                    name=p.name,
+                    url=to_docker_url(p.url),
+                    api_key=p.api_key
+                ) for k, p in self.providers.items()
+            },
+            models=self.models,
+            agent=self.agent
+        )
+
+
     def normalized(self) -> dict[str, Any]:
         """
         Returns a normalized dictionary representation of this Config.

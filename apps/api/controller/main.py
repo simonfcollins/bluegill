@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     
     sm = SessionManager(SessionRepository(), MessageRepository())
-    cfg = load_config(CONFIG_PATH)
+    cfg = load_config(CONFIG_PATH).dockerize()
     wr = WorkspaceRegistry(list(cfg.workspaces.values()), Path("/home/assistant/workspaces"))
     
     app.state.session_manager = sm
