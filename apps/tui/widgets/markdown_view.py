@@ -1,12 +1,10 @@
 import re
 from typing import Generator
 
-from rich.syntax import Syntax
-from textual.widgets import Static, Button, Markdown
+from textual.widgets import Markdown
 from textual.containers import Vertical
 
-from widgets.copy_button import CopyButton
-
+from widgets.code_block import CodeBlock
 
 # regex to match markdown fenced code blocks
 CODE_BLOCK_RE = re.compile(
@@ -27,7 +25,7 @@ class MarkdownView(Vertical):
         self.content = content
 
 
-    def compose(self) -> Generator[Markdown | Static | Button]:
+    def compose(self) -> Generator[Markdown | CodeBlock]:
         """
         Textual compose method override.
         Uses custom builder to compose widget.
@@ -36,7 +34,7 @@ class MarkdownView(Vertical):
         yield from self._build_widgets()
 
 
-    def _build_widgets(self) -> Generator[Markdown | Static | Button]:
+    def _build_widgets(self) -> Generator[Markdown | CodeBlock]:
         """
         Separates markdown fenced code blocks from other markdown prose and builds
         widgets for each separately.
@@ -57,8 +55,7 @@ class MarkdownView(Vertical):
             lang = match.group("lang") or "text"
             code = match.group("code")
 
-            yield Static(Syntax(code, lang, theme="native", padding=1))
-            yield CopyButton(text=code)
+            yield CodeBlock(code, lang)
 
             last_index = end
 

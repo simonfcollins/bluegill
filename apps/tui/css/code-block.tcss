@@ -1,0 +1,5 @@
+CodeBlock {
+    margin-bottom: 1;
+    width: 1fr;
+    height: auto;
+}

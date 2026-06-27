@@ -23,7 +23,6 @@ InfoBar {
     text-align: right;
 }
 
-
 .token-bar {
     width: auto;
     align: right middle;
