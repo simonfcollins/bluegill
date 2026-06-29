@@ -19,6 +19,26 @@ DOCKER_BASE_DIR = Path(f"/home/{DOCKER_USER}/workspaces/")
 DOCKER_IMAGE = "bluegill_agent:latest"
 
 
+def is_docker_native() -> bool:
+    try:
+        result = subprocess.run(
+            [
+                "docker", "info", "--format", "{{.Name}}"
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True
+        )
+        return result.stdout != "docker-desktop"
+
+    except subprocess.CalledProcessError:
+        return False
+    
+
+IS_DOCKER_NATIVE = is_docker_native()
+
+
 def verify_docker() -> bool:
     """
     Returns True if Docker is installed on the host. False otherwise.
@@ -104,7 +124,7 @@ def create_runtime_config() -> Config:
 
     cfg = load_config(src)
 
-    if platform.system() in ("Darwin", "Windows"):
+    if not IS_DOCKER_NATIVE:
         cfg = cfg.dockerize()
 
     dst.write_text(json.dumps(cfg.normalized(), indent=4))
@@ -147,7 +167,7 @@ def launch_agent() -> None:
         
     # docker launch command
     
-    if platform.system() == "Linux":
+    if IS_DOCKER_NATIVE:
         cmd = [
             "docker", "run", "--rm",
             "--network", "host",
