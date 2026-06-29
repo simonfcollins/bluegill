@@ -1,6 +1,14 @@
 class ProviderError(Exception):
-    pass
+    def __init__(self, message: str):
+        super().__init__(message)
+    
 
 
 class InvalidProviderError(ProviderError):
-    pass
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
+class AbilityError(ProviderError):
+    def __init__(self, message: str):
+        super().__init__(message)

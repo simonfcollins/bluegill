@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator
 import json
+import httpx
 
 from bluegill_shared.models import Message
 
@@ -13,6 +14,7 @@ class BaseLLMProvider(ABC):
 
     def __init__(self, base_url: str | None) -> None:
         self.base_url = base_url.rstrip("/") if base_url else None
+        self._client = httpx.AsyncClient(base_url=base_url or "")
 
     
     @abstractmethod

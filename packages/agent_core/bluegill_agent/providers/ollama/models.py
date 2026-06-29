@@ -1,4 +1,7 @@
+# Up to date as of Ollama version 0.30.11
+
 from pydantic import BaseModel
+from datetime import datetime
 
 from bluegill_agent.schemas.llm_stream_response import LLMStreamResponse
 
@@ -34,7 +37,7 @@ class OllamaStreamResponse(BaseModel):
         
         eval_duration: Time in nanoseconds spent generating the response.
         
-    References:
+    Reference:
         https://ollama.readthedocs.io/en/api/#response
     """
     
@@ -78,4 +81,75 @@ class OllamaStreamResponse(BaseModel):
             total_duration=self.total_duration,
             token_count=token_count
         )
+            
         
+class OllamaTagDetails(BaseModel):
+    """
+    Represents specific details for an Ollama provided model.
+    
+    Attributes:
+
+        format: Model file format (for example gguf).
+        
+        family: Primary model family (for example llama).
+        
+        families: All families the model belongs to, when applicable.
+        
+        parameter_size: Approximate parameter count label (for example 7B, 13B).
+        
+        quantization_level: Quantization level used (for example Q4_0).
+        
+        context_length: The maximum number of context units this model can injest.
+        
+    Reference:
+        https://docs.ollama.com/api/tags
+    """
+    
+    format: str | None = ""
+    family: str | None = None
+    families: list[str] | None = []
+    parameter_size: str | None = None
+    quantization_level: str | None = None
+    context_length: int | None = None
+    embedding_length: int | None = None
+        
+        
+class OllamaTag(BaseModel):
+    """
+    Represents an object returned in response to the Ollama '/api/tags' endpoint.
+    Contains information about a model.
+    
+    Attributes:
+    
+        name: Model name.
+        
+        model: Model name.
+        
+        remote_model: Name of the upstream model, if the model is remote.
+        
+        remote_host: URL of the upstream Ollama host, if the model is remote.
+        
+        modified_at: Last modified timestamp in ISO 8601 format.
+        
+        size: Total size of the model on disk in bytes.
+        
+        digest: SHA256 digest identifier of the model contents.
+        
+        details: Additional information about the model's format and family.
+        
+        capabilities: A list of capabilities supported by the model (for example 'thinking').
+
+    Reference:
+        https://docs.ollama.com/api/tags
+    """
+    
+    name: str
+    model: str
+    remote_model: str | None = None
+    remote_host: str | None = None
+    modified_at: datetime
+    size: int
+    digest: str
+    details: OllamaTagDetails
+    capabilities: list[str] | None = None
+    
