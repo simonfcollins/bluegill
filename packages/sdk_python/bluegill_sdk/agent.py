@@ -143,6 +143,27 @@ class Agent:
         except (httpx.HTTPError, ValidationError) as e:
             raise AgentError("Error loading last session") from e
         
+
+    def duplicate_session(self, session_id: str) -> Session:
+        """
+        Duplicate the session with the given ID and it's context.
+        """
+
+        try:
+            response = self._client.post(f"{self.api_url}/sessions/{session_id}/duplicate")
+            response.raise_for_status()
+
+            return Session.model_validate(response.json())
+        
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise NotFoundError(f"No session found with the ID '{session_id}'")
+            
+            raise AgentError("Error duplicating session") from e
+            
+        except (httpx.HTTPError, ValidationError) as e:
+            raise AgentError("Error duplicating session") from e
+        
     
     def delete_session(self, session_id: str) -> None:
         """

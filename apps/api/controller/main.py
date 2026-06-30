@@ -100,7 +100,7 @@ async def get_last_session(request: Request) -> Session:
     
     session = try_session_manager(sm.load_last_session)
     
-    if session == None:
+    if session is None:
         raise HTTPException(
             status_code=404, 
             detail="No sessions found. Create a new session using the '/sessions' POST endpoint"
@@ -119,7 +119,7 @@ async def get_session(session_id: str, request: Request) -> Session:
     
     session = try_session_manager(sm.get_session, session_id=session_id)
 
-    if not session:
+    if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
     return session
@@ -159,6 +159,22 @@ async def clear_session(session_id: str, request: Request) -> dict[str, str]:
     try_session_manager(sm.clear_session, session_id=session_id)
     
     return {"status": "Session cleared"}
+
+
+@app.post("/sessions/{session_id}/duplicate")
+async def duplicate_session(session_id: str, request: Request) -> Session:
+    """
+    Duplicate the given session and it's context.
+    """
+
+    sm = request.app.state.session_manager
+
+    session = try_session_manager(sm.duplicate_session, session_id=session_id)
+
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return session
 
 
 @app.post("/sessions/{session_id}/compact")

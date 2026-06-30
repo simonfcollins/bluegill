@@ -210,6 +210,9 @@ class Bluegill(App):
             case "/delete":
                 await self._handle_delete_session_command()
 
+            case "/duplicate":
+                await self._handle_duplicate_session_command()
+
             case _:
                 self.notify("Command not found.", severity="warning")
                 
@@ -257,6 +260,7 @@ class Bluegill(App):
                     "/session": "[bold]/session[/bold]\n[dim]change sessions[/dim]",
                     "/new": "[bold]/new[/bold]\n[dim]start a new session[/dim]",
                     "/clear": "[bold]/clear[/bold]\n[dim]clear the current session[/dim]",
+                    "/duplicate": "[bold]/duplicate[/bold]\n[dim]duplicate session[/dim]",
                     "/delete": "[bold]/delete[/bold]\n[dim]delete session[/dim]",
                 },
                 "Select command"
@@ -345,6 +349,7 @@ class Bluegill(App):
     async def _handle_change_session_command(self) -> None:
         """
         Handler for the '/session' command.
+        Changes the agent's active session.
         """
         
         try:
@@ -367,6 +372,7 @@ class Bluegill(App):
     async def _handle_change_model_command(self) -> None:
         """
         Handler for the '/model' command.
+        Changes the agent's active model.
         """
        
         model_id = await self.push_screen_wait(
@@ -393,6 +399,7 @@ class Bluegill(App):
     async def _handle_delete_session_command(self) -> None:
         """
         Handler for the '/delete' command.
+        Deletes a session.
         """
 
         try:
@@ -431,26 +438,64 @@ class Bluegill(App):
             # delete the chosen session
             try:    
                 self.agent.delete_session(session_id)
+                self.notify("Session deleted.")
 
             except AgentError as e:
                 self._handle_agent_error(e)
                 return
 
+            # need to update UI if the deleted session is the current session
             if old_session_id == session_id:
+
+                # try to load a previous session
                 try:
                     self.agent.load_last_session()
                     self._change_session(self.agent.session_id)
 
+                # no previous session
                 except NotFoundError as e:
                     self._change_session(None)
 
+                # unexpected error
                 except AgentError as e:
                     self._handle_agent_error(e)
                     return
+                
+            
+    async def _handle_duplicate_session_command(self) -> None:
+        """
+        Handler for the '/duplicate' command.
+        Duplicates a session.
+        """
 
-            self.notify("Session deleted.")
-
+        try:
+            sessions = self.agent.get_sessions()
         
+        except AgentError as e:
+            self._handle_agent_error(e)
+            return
+        
+        session_id = await self.push_screen_wait(
+            ItemSelectModal({s.id: s.name for s in sessions}, "Duplicate Session")
+        )
+
+        if session_id is None:
+            return
+        
+        # duplicate the chose session and set it as active
+        try:
+            session = self.agent.duplicate_session(session_id)
+            self._change_session(session.id)
+            self.notify("Session duplicated")
+
+        except NotFoundError:
+            self.notify("Session not found!", severity="warning")
+
+        except AgentError as e:
+            self._handle_agent_error(e)
+            return
+        
+
     #==================================================
     #              AGENT STREAMING LOGIC
     #==================================================

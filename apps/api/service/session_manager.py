@@ -22,7 +22,7 @@ class SessionManager:
         try:
             session_id = str(uuid.uuid4())
             self._add_session(session_id, workspace_id=workspace_id)
-            session = self.session_repository.get(session_id)
+            session = self.get_session(session_id)
 
             if not session:
                 raise SessionManagerError(
@@ -31,8 +31,8 @@ class SessionManager:
 
             return session
 
-        except RepositoryError as e:
-            raise SessionManagerError("Failed to create new session") from e
+        except SessionManagerError:
+            raise
 
         except Exception as e:
             raise SessionManagerError("Unexpected error in new_session") from e
@@ -159,6 +159,54 @@ class SessionManager:
             raise SessionManagerError(
                 f"Unexpected error updating session '{session_id}'") from e
       
+
+    def duplicate_session(self, session_id: str) -> Session | None:
+        """
+        Creates a copy of the given session and it's context.
+        """
+
+        original_session = self.get_session(session_id)
+        original_context = self.get_messages(session_id)
+
+        if original_session is None:
+            return None
+
+        try:
+            copy_session_id = str(uuid.uuid4())
+            self._add_session(
+                copy_session_id, 
+                workspace_id=original_session.workspace_id, 
+                name=f"{original_session.name} (Copy)", 
+                tokens_used=original_session.tokens_used
+            )
+
+            session = self.get_session(copy_session_id)
+
+            if not session:
+                raise SessionManagerError(
+                    f"Session '{copy_session_id}' was not found after creation"
+                )
+            
+            self.add_messages(
+                [
+                    Message(
+                        role=m.role,
+                        session_id=copy_session_id,
+                        content=m.content
+                    )
+                    for m in original_context
+                ]
+            )
+
+            return session
+
+        except SessionManagerError:
+            raise
+
+        except Exception as e:
+            raise SessionManagerError("Unexpected error while duplicating session") from e
+
+    
         
     def delete_session(self, session_id: str) -> None:
         """
@@ -248,10 +296,22 @@ class SessionManager:
                 f"Unexpected error getting messages for session '{session_id}'") from e
         
         
-    def _add_session(self, session_id: str, workspace_id: str, name: str = "New Session", tokens_used: int = 0) -> None:
+    def _add_session(
+        self, 
+        session_id: str, 
+        workspace_id: str, 
+        name: str | None = "New Session", 
+        tokens_used: int | None = 0
+    ) -> None:
         """
         Persists a new session entity to the database.
         """
+
+        if name is None:
+            name = "New Session"
+
+        if tokens_used is None: 
+            tokens_used = 0
         
         try:
             self.session_repository.insert(
