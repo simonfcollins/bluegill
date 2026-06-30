@@ -78,9 +78,8 @@ class LocalOllamaProvider(BaseLLMProvider):
             capabilities.append("thinking")
         
         missing_capabilities = await self._verify_capabilities(model, capabilities)
-        print(missing_capabilities)
         missing = ", ".join(missing_capabilities)
-        print(missing)
+        
         if missing_capabilities:
             raise AbilityError(f"Model '{model}' does not support '{missing}'")
         

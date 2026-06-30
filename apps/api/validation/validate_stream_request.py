@@ -32,6 +32,7 @@ async def validate_stream_request(payload: StreamRequest, sm: SessionManager, cf
             provider_name=payload.provider,
             base_url=cfg.providers[payload.provider].url
         )
+        
     except InvalidProviderError:
         raise HTTPException(
             status_code=400,

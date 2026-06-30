@@ -1,0 +1,30 @@
+Confirm {
+    align: center middle;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+Confirm > Container {
+    width: 60;
+    height: auto;
+    layout: vertical;
+    align: center middle;
+    background: $surface;
+    padding: 1;
+}
+
+Confirm > Container > Horizontal {
+    width: 100%;
+    height: auto;
+    align: center middle;
+}
+
+Confirm > Container > Label {
+    width: 100%;
+    height: auto;
+    text-align: center;
+    margin-bottom: 1;
+}
+
+.yes-button {
+    margin-right: 2;
+}

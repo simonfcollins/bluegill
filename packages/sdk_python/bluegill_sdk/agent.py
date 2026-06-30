@@ -9,6 +9,12 @@ from bluegill_sdk.exception import AgentError, NotFoundError
 
 
 class Agent:
+    """
+    A lightweight Python SDK for interacting with the Bluegill API. 
+    This SDK provides a simple interface for managing sessions and 
+    querying language models via supported providers.
+    """
+
     def __init__(
         self,
         api_url: str = "http://localhost:54345", # URL where the Bluegill API is running.
@@ -28,10 +34,14 @@ class Agent:
         self._config = None
         self._timeout = timeout
         self._client = httpx.Client(timeout=self._timeout)
-        
+
         if session_id:
             self.load_session(session_id)
 
+
+    #==================================================
+    #                SESSION MANAGEMENT
+    #==================================================
 
     def new_session(self, workspace_id: str) -> Session:
         """
@@ -99,7 +109,7 @@ class Agent:
             self._session_name = session.name
             self._tokens_used = session.tokens_used
             self._workspace_id = session.workspace_id
-            self._load_messages()
+            self._messages = self.dump(self._session_id)
             return True
             
         except (httpx.HTTPError, ValidationError) as e:
@@ -120,7 +130,7 @@ class Agent:
             self._session_name = session.name
             self._workspace_id = session.workspace_id
             self._tokens_used = session.tokens_used
-            self._load_messages()
+            self._messages = self.dump(self._session_id)
             
             return session
             
@@ -132,6 +142,26 @@ class Agent:
 
         except (httpx.HTTPError, ValidationError) as e:
             raise AgentError("Error loading last session") from e
+        
+    
+    def delete_session(self, session_id: str) -> None:
+        """
+        Delete the session with the given ID.
+        """
+
+        try:
+            response = self._client.delete(f"{self.api_url}/sessions/{session_id}")
+            response.raise_for_status()
+
+        except httpx.HTTPError as e:
+            raise AgentError(f"Error deleting session '{session_id}'") from e
+        
+        if self.session_id == session_id:
+            self._session_id = None
+            self._session_name = ""
+            self._workspace_id = ""
+            self._tokens_used = 0
+            self._messages = []
         
         
     def get_sessions(self) -> list[Session]:
@@ -147,11 +177,16 @@ class Agent:
         
         except (httpx.HTTPError, ValidationError) as e:
             raise AgentError("Error retrieving session list") from e
-        
+
+
+    #==================================================
+    #                OTHER ENDPOINTS
+    #==================================================
         
     def load_config(self) -> Config:
         """
-        Reloads the server config file.
+        Retrieves the server config file. 
+        Automatically called when accessing self.config.
         """
         
         try:
@@ -185,7 +220,11 @@ class Agent:
 
         except (httpx.HTTPError, ValidationError) as e:
             raise AgentError("Error retrieving session message dump") from e
-    
+
+
+    #==================================================
+    #                 STREAMING LOGIC
+    #==================================================   
     
     async def chat_stream(self, prompt: str, think: bool = False) -> AsyncGenerator[AgentStreamResponse, None]:
         """
@@ -217,6 +256,7 @@ class Agent:
                 
                 try:
                     response.raise_for_status()
+                    
                 except httpx.HTTPStatusError as e:
                     await response.aread()
                     detail = response.json().get("detail", str(e))
@@ -244,6 +284,10 @@ class Agent:
         
         self.load_session(self._session_id)
         
+
+    #==================================================
+    #                    Helpers
+    #==================================================
         
     def service_running(self) -> bool:
         """
@@ -267,9 +311,9 @@ class Agent:
         self._client.close()
 
 
-    # ------------------------
-    # Properties
-    # ------------------------
+    #==================================================
+    #                  Properties
+    #==================================================
 
     @property
     def session_id(self) -> str | None:
@@ -285,6 +329,9 @@ class Agent:
         Params:
             session_id - The new session_id.
         """
+
+        if session_id == self._session_id:
+            return
         
         if session_id:
             self.load_session(session_id)
@@ -334,16 +381,3 @@ class Agent:
     def session_name(self) -> str:
         return self._session_name
     
-    
-    # ------------------------
-    # Internal
-    # ------------------------
-    
-    def _load_messages(self) -> None:
-        """
-        Load the message chain of the active session.
-        Stored by self._messages.
-        """
-        
-        self._messages = self.dump(self.session_id)
-        

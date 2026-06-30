@@ -1,4 +1,4 @@
-from typing import Generator
+from textual.app import ComposeResult
 from textual.screen import ModalScreen
 from textual.widgets import ListView, ListItem, Label
 from textual.containers import Container
@@ -21,7 +21,7 @@ class ItemSelectModal(ModalScreen[str | None]):
         self._title = title
 
 
-    def compose(self) -> Generator:
+    def compose(self) -> ComposeResult:
         content = ListView(
             *[
                 ListItem(Label(str(self._items.get(i)), classes="ism-item-label"), name=i, classes="ism-item")

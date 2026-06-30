@@ -1,6 +1,6 @@
 import re
-from typing import Generator
 
+from textual.app import ComposeResult
 from textual.widgets import Markdown
 from textual.containers import Vertical
 
@@ -25,7 +25,7 @@ class MarkdownView(Vertical):
         self.content = content
 
 
-    def compose(self) -> Generator[Markdown | CodeBlock]:
+    def compose(self) -> ComposeResult:
         """
         Textual compose method override.
         Uses custom builder to compose widget.
@@ -34,7 +34,7 @@ class MarkdownView(Vertical):
         yield from self._build_widgets()
 
 
-    def _build_widgets(self) -> Generator[Markdown | CodeBlock]:
+    def _build_widgets(self) -> ComposeResult:
         """
         Separates markdown fenced code blocks from other markdown prose and builds
         widgets for each separately.

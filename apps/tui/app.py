@@ -13,6 +13,7 @@ from widgets.chat_view import ChatView
 from widgets.chat_input import ChatInput
 from widgets.item_select_modal import ItemSelectModal
 from widgets.info_bar import InfoBar
+from widgets.confirm import Confirm
 
 
 class Bluegill(App):
@@ -90,7 +91,7 @@ class Bluegill(App):
             model=f"{self.agent.model} - {self.agent.provider}" if self.agent.model else None
         )
         
-        self._handle_session_change(self.agent.session_id or "")
+        self._change_session(self.agent.session_id)
         
         self.input.focus()
         
@@ -206,6 +207,9 @@ class Bluegill(App):
             case "/model": # change model
                 await self._handle_change_model_command()
                 
+            case "/delete":
+                await self._handle_delete_session_command()
+
             case _:
                 self.notify("Command not found.", severity="warning")
                 
@@ -213,7 +217,7 @@ class Bluegill(App):
         self.input.focus()
                 
 
-    def _handle_session_change(self, session_id: str) -> None:
+    def _change_session(self, session_id: str | None) -> None:
         """
         Updates the DOM accordingly in the event of a session change.
         """
@@ -249,14 +253,16 @@ class Bluegill(App):
         command = await self.push_screen_wait(
             ItemSelectModal(
                 {
+                    "/model": "[bold]/model[/bold]\n[dim]change models[/dim]",
                     "/session": "[bold]/session[/bold]\n[dim]change sessions[/dim]",
                     "/new": "[bold]/new[/bold]\n[dim]start a new session[/dim]",
                     "/clear": "[bold]/clear[/bold]\n[dim]clear the current session[/dim]",
-                    "/model": "[bold]/model[/bold]\n[dim]change models[/dim]",
+                    "/delete": "[bold]/delete[/bold]\n[dim]delete session[/dim]",
                 },
                 "Select command"
             )
         )
+
         if command is None:
             return
             
@@ -351,10 +357,11 @@ class Bluegill(App):
         session_id = await self.push_screen_wait(
             ItemSelectModal({s.id: s.name for s in sessions}, "Select Session")
         )
+
         if session_id is None:
             return
         
-        self._handle_session_change(session_id)
+        self._change_session(session_id)
     
     
     async def _handle_change_model_command(self) -> None:
@@ -370,6 +377,7 @@ class Bluegill(App):
                 },
             "Select Model")
         )
+
         if model_id is None:
             return
 
@@ -380,7 +388,68 @@ class Bluegill(App):
             token_window=self.context_size,
             model=f"{self.agent.model} - {self.agent.provider}"
         )
+
+
+    async def _handle_delete_session_command(self) -> None:
+        """
+        Handler for the '/delete' command.
+        """
+
+        try:
+            sessions = self.agent.get_sessions()
         
+        except AgentError as e:
+            self._handle_agent_error(e)
+            return
+        
+        session_id = await self.push_screen_wait(
+            ItemSelectModal({s.id: s.name for s in sessions}, "Delete Session")
+        )
+
+        if session_id is None:
+            return
+        
+        session = next(
+            (
+                s for s in sessions if s.id == session_id
+            ), None
+        )
+
+        if session is None:
+            return
+
+        value = await self.push_screen_wait(
+            Confirm(
+                f"Are you want to delete session\n[bold]'{session.name}'[/bold]?"
+            )
+        )
+
+        if value:
+            # save the current agent session_id
+            old_session_id = self.agent.session_id
+
+            # delete the chosen session
+            try:    
+                self.agent.delete_session(session_id)
+
+            except AgentError as e:
+                self._handle_agent_error(e)
+                return
+
+            if old_session_id == session_id:
+                try:
+                    self.agent.load_last_session()
+                    self._change_session(self.agent.session_id)
+
+                except NotFoundError as e:
+                    self._change_session(None)
+
+                except AgentError as e:
+                    self._handle_agent_error(e)
+                    return
+
+            self.notify("Session deleted.")
+
         
     #==================================================
     #              AGENT STREAMING LOGIC

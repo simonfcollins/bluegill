@@ -30,7 +30,7 @@ def is_docker_native() -> bool:
             text=True,
             check=True
         )
-        return result.stdout != "docker-desktop"
+        return result.stdout.strip() != "docker-desktop"
 
     except subprocess.CalledProcessError:
         return False

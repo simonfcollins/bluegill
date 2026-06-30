@@ -255,7 +255,7 @@ async def run_agent(
         if tool_call:
             yield AgentStreamResponse(
                 event="error",
-                content="Stream ended with an incomplete tool call"
+                content=f"Stream ended with an incomplete tool call:\n{tool_buffer_str}"
             )
         
         if not stream_complete:

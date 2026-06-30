@@ -125,6 +125,17 @@ async def get_session(session_id: str, request: Request) -> Session:
     return session
     
 
+@app.get("/sessions/{session_id}/dump")
+async def dump_session(session_id: str, request: Request) -> list[Message]:
+    """
+    Returns the specified sessions message chain.
+    """
+    
+    sm = request.app.state.session_manager
+    
+    return try_session_manager(sm.get_messages, session_id=session_id)
+
+
 @app.post("/sessions")
 async def create_session(payload: NewSessionRequest, request: Request) -> Session:
     """
@@ -150,17 +161,6 @@ async def clear_session(session_id: str, request: Request) -> dict[str, str]:
     return {"status": "Session cleared"}
 
 
-@app.get("/sessions/{session_id}/dump")
-async def dump_session(session_id: str, request: Request) -> list[Message]:
-    """
-    Returns the specified sessions message chain.
-    """
-    
-    sm = request.app.state.session_manager
-    
-    return try_session_manager(sm.get_messages, session_id=session_id)
-
-
 @app.post("/sessions/{session_id}/compact")
 async def compact(session_id: str, request: Request) -> dict[str, str]:
     """
@@ -170,6 +170,17 @@ async def compact(session_id: str, request: Request) -> dict[str, str]:
     sm = request.app.state.session_manager
     
     raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@app.delete("/sessions/{session_id}")
+async def delete_session(session_id: str, request: Request) -> None:
+    """
+    Delete the session with the given session_id
+    """
+
+    sm = request.app.state.session_manager
+
+    try_session_manager(sm.delete_session, session_id=session_id)
 
 
 @app.get("/models")
